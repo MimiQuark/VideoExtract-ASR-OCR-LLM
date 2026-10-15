@@ -1,0 +1,11 @@
+faster-whisper
+yt-dlp
+rapidocr-onnxruntime
+opencv-python-headless
+openai
+opencc-python-reimplemented
+
+# ---- Web 界面（可选，仅 server.py 需要）----
+fastapi
+uvicorn[standard]
+python-multipart

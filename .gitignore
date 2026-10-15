@@ -1,0 +1,17 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 大体积中间产物：视频与抽帧
+output/_download/
+output/**/frames/
+*.wav
+
+# 可重新获取的二进制（setup.ps1 / imageio-ffmpeg 都能装回来，不必进版本库）
+tools/*.exe
+
+# 人工标注模板（每人自己生成，不入库）
+eval/review_*.jsonl
+
+# 运行时产物
+reports/

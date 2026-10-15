@@ -1,0 +1,1349 @@
+{
+ "video": "时隔六年，曝光一下我的最新简历！",
+ "source": "https://www.bilibili.com/video/BV1DCDjBRExV",
+ "labeled_by": "逐条人工判定（2026-10-15）",
+ "note": "verdict 取值 ok/wrong/bleed/neutral；reason 取值 ocr/noise/loss/score/norm/fmt/dup。抽样复核建议：见 eval_repair.py --review",
+ "cases": [
+  {
+   "seq": 1,
+   "index": 0,
+   "start": 0.0,
+   "before": "大家好我是程序员余皮",
+   "after": "大家好我是程序员鱼皮",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 2,
+   "index": 2,
+   "start": 4.72,
+   "before": "这些年我帮大家修改过几千份简历",
+   "after": "这些年我帮大家修改过凡千份简历",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 3,
+   "index": 10,
+   "start": 22.12,
+   "before": "汇AI已经不是加分项",
+   "after": "会AI已经不是加分项",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 4,
+   "index": 16,
+   "start": 33.78,
+   "before": "所以如果你的简历上还是轻一色的CRUD项目",
+   "after": "所以如果你的简历上还是清一色的CRUD项目",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 5,
+   "index": 20,
+   "start": 46.86,
+   "before": "以前我们说全站可能就是前端加后端",
+   "after": "以前我们说全栈可能就是前端加后端",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 6,
+   "index": 25,
+   "start": 57.82,
+   "before": "甚至还要懂产品思维、数据分析、监控运为",
+   "after": "甚至还要懂产品思维、数据分析、监控运维",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 7,
+   "index": 26,
+   "start": 61.54,
+   "before": "像最近很火的艺人公司概念",
+   "after": "像最近很火的一人公司概念",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 8,
+   "index": 40,
+   "start": 95.82,
+   "before": "然后再一着板块一着板块的告诉你",
+   "after": "然后再一个板块一个板块地告诉你",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 9,
+   "index": 45,
+   "start": 105.38,
+   "before": "你至少能收获三样东西",
+   "after": "你至少能收获3样东西",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 10,
+   "index": 49,
+   "start": 111.54,
+   "before": "点着收藏",
+   "after": "点个收藏",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 11,
+   "index": 54,
+   "start": 120.5,
+   "before": "也是可以在我们开发的老余简历上去获取到的",
+   "after": "也是可以在我们开发的老鱼简历上去获取到的",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 12,
+   "index": 55,
+   "start": 124.5,
+   "before": "那下面我按照简历的版则顺序",
+   "after": "那下面我按照简历的板块顺序",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 13,
+   "index": 61,
+   "start": 136.06,
+   "before": "基本就是加瓦后端开发或者前端开发",
+   "after": "基本就是Java后端开发或者前端开发",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 14,
+   "index": 63,
+   "start": 142.42,
+   "before": "比如加瓦后端开发",
+   "after": "Java后端开发",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 15,
+   "index": 64,
+   "start": 144.06,
+   "before": "括号具备AI agent全站开发经验",
+   "after": "Java后端开发（具备AIAgent全栈开发经验",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 16,
+   "index": 65,
+   "start": 147.58,
+   "before": "点名你的AI相关经验",
+   "after": "点明你的AI相关经验",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 17,
+   "index": 67,
+   "start": 151.46,
+   "before": "一份简历可能就看十秒钟",
+   "after": "一份简历可能就看10秒钟",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 18,
+   "index": 69,
+   "start": 155.1,
+   "before": "开头三秒",
+   "after": "开头没吸引住→直接划走 一份简历可能就看10秒",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 19,
+   "index": 71,
+   "start": 157.3,
+   "before": "就直接划走了",
+   "after": "HR筛简历=10秒钟，开头没吸引住→直接划走了",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 20,
+   "index": 72,
+   "start": 158.98,
+   "before": "既然你真的有AI agent开发经验",
+   "after": "既然你真的有Alagent开发经验",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 21,
+   "index": 78,
+   "start": 169.82,
+   "before": "放你的作品及网站和GitHub链接",
+   "after": "放你的作品集网站和GitHub链接",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 22,
+   "index": 85,
+   "start": 180.86,
+   "before": "毕竟搭个网站也要花不少时间",
+   "after": "毕竞搭个网站也要花不少时间",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 23,
+   "index": 90,
+   "start": 191.46,
+   "before": "那我看过的十份简历中",
+   "after": "那我看过的10份简历中",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 24,
+   "index": 91,
+   "start": 193.02,
+   "before": "可能八份都没有线上作品地址",
+   "after": "可能8份都没有线上作品地址",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 25,
+   "index": 92,
+   "start": 195.66,
+   "before": "如果你有",
+   "after": "10份简历中8份没有线上作品地址→你有",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 26,
+   "index": 93,
+   "start": 196.58,
+   "before": "面试端可以直接点进去",
+   "after": "面试官可以直接点进去",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 27,
+   "index": 97,
+   "start": 203.7,
+   "before": "上限项目是最能增加简历真实性的方法",
+   "after": "上线项目是最能增加简历真实性的方法",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 28,
+   "index": 100,
+   "start": 209.94,
+   "before": "搞著作品集网站本身就是一种能力和主动性的证明",
+   "after": "搞个作品集网站本身就是一种能力和主动性的证明",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 29,
+   "index": 101,
+   "start": 214.1,
+   "before": "面试装看到你有作品集",
+   "after": "面试官看到你有作品集",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 30,
+   "index": 104,
+   "start": 217.5,
+   "before": "这人至少会部署上限项目",
+   "after": "这人至少会部署上线项目",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 31,
+   "index": 109,
+   "start": 226.3,
+   "before": "但有三个小技巧值得注意",
+   "after": "但有3个小技巧值得注意",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 32,
+   "index": 113,
+   "start": 233.54,
+   "before": "你教育背景就一行",
+   "after": "先看简历中的教育背景和奖项板块：",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 33,
+   "index": 115,
+   "start": 236.34,
+   "before": "没有必要分成两只板块单独写",
+   "after": "没有必要分成两个板块单独写",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 34,
+   "index": 116,
+   "start": 238.5,
+   "before": "合在一起正紧凑",
+   "after": "合在一起更紧凑",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 35,
+   "index": 129,
+   "start": 263.54,
+   "before": "和球职掌位相关的",
+   "after": "和求职岗位相关的",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 36,
+   "index": 135,
+   "start": 272.38,
+   "before": "昆武大赛男子组第六名",
+   "after": "昆舞大赛男子组第六名",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 37,
+   "index": 136,
+   "start": 275.34,
+   "before": "面试端颤到一堆没听过的比赛名称",
+   "after": "面试官看到一堆没听过的比赛名称",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 38,
+   "index": 145,
+   "start": 292.18,
+   "before": "像Java,Spring Boot,Mythetro,Redis,Dolter",
+   "after": "像Java、Spring Boot,Mythetro,Redis,Dolter",
+   "verdict": "ok",
+   "reason": "fmt"
+  },
+  {
+   "seq": 39,
+   "index": 151,
+   "start": 306.42,
+   "before": "比如第六条,监控告警体系",
+   "after": "山第六条：监控告警体系",
+   "verdict": "wrong",
+   "reason": "noise"
+  },
+  {
+   "seq": 40,
+   "index": 153,
+   "start": 309.98,
+   "before": "诶,这不是运维的活儿吗",
+   "after": "哎这不是运维的活儿吗",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 41,
+   "index": 159,
+   "start": 323.74,
+   "before": "出了问题就是你自己解决",
+   "after": "出了问题就是你自已解决",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 42,
+   "index": 160,
+   "start": 325.9,
+   "before": "所以如果你的简历上有普罗密修斯",
+   "after": "所以如果你的简历上有Prometheus",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 43,
+   "index": 164,
+   "start": 334.9,
+   "before": "喜欢就不管了",
+   "after": "写完就不管了",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 44,
+   "index": 166,
+   "start": 337.3,
+   "before": "还有第七条",
+   "after": "Q第七条",
+   "verdict": "wrong",
+   "reason": "noise"
+  },
+  {
+   "seq": 45,
+   "index": 169,
+   "start": 343.98,
+   "before": "我也很少在三年以下经验的简历上看到有人写过",
+   "after": "我也很少在3年以下经验的简历上看到有人写过",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 46,
+   "index": 172,
+   "start": 351.18,
+   "before": "让你的网站在百度主车上的排名正号前",
+   "after": "让你的网站在百度谷歌上的排名更靠前",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 47,
+   "index": 174,
+   "start": 356.9,
+   "before": "让你的内容正容易被AI工具引用和推荐给用户",
+   "after": "让你的内容更容易被AI工具引用和推荐给用户",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 48,
+   "index": 175,
+   "start": 361.14,
+   "before": "有同学肯定又懵了啊",
+   "after": "有同学肯定又蒙了啊",
+   "verdict": "neutral",
+   "reason": "score"
+  },
+  {
+   "seq": 49,
+   "index": 176,
+   "start": 362.82,
+   "before": "我一着后端开发",
+   "after": "我一个后端开发",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 50,
+   "index": 177,
+   "start": 364.38,
+   "before": "干嘛要懂这这啊",
+   "after": "干嘛要懂这个啊",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 51,
+   "index": 179,
+   "start": 369.66,
+   "before": "AI编程工具让实现终能变得不那么难",
+   "after": "AI编程工具让实现功能变得不那么难",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 52,
+   "index": 186,
+   "start": 387.42,
+   "before": "而写代码之后",
+   "after": "写代码成本越来越低→写代码之前（想法、方案、选型）和写代码之后",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 53,
+   "index": 188,
+   "start": 390.0,
+   "before": "做推广、引流、搭建监控、分析数据",
+   "after": "上线+推广、引流+搭建监控+分析数据",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 54,
+   "index": 200,
+   "start": 415.56,
+   "before": "现在有企业朝一的后端开发",
+   "after": "现在有企业招一个后端开发",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 55,
+   "index": 208,
+   "start": 433.68,
+   "before": "而且字字珠鸡",
+   "after": "而且字字珠玑",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 56,
+   "index": 213,
+   "start": 442.68,
+   "before": "Spring AI, Launching 4G这些框架",
+   "after": "SpringAl、LangChain4j等AI开发框架，独立开发过涉及RAG、工具调用、MCP、多Agent协作的企业级AI智能体应用 个人信息 SpringAl、LangChain4G、MCP、Agent是企业真正在用的东西",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 57,
+   "index": 214,
+   "start": 444.94,
+   "before": "就相当于AI时代的Spring Boot",
+   "after": "熟悉SpringAl、LangChain4j等AI时代的Spring Boot",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 58,
+   "index": 216,
+   "start": 450.98,
+   "before": "而RIG, MCP和Agent",
+   "after": "而RAG、MCP和Agent",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 59,
+   "index": 223,
+   "start": 467.42,
+   "before": "我调着大模型的API就算懂AI开发了",
+   "after": "我调个大模型的API就算懂AI开发了",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 60,
+   "index": 225,
+   "start": 472.5,
+   "before": "你能构建有效的RAG支持库",
+   "after": "你能构建有效的RAG知识库",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 61,
+   "index": 226,
+   "start": 475.18,
+   "before": "能优化Propt让模型输出更精准",
+   "after": "能优化propt让模型输出更精准",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 62,
+   "index": 232,
+   "start": 488.9,
+   "before": "希望程序员会用Cursor Cloud Code",
+   "after": "熟悉Cursor/ClaudeCode/GitHubCopilot等Al编程工具开发全栈项目，掌握MCPServer和AgentSkills的开发和发布 个人信息 会用Cursor/ClaudeCode",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 63,
+   "index": 233,
+   "start": 491.42,
+   "before": "Data ProPilot这些工具",
+   "after": "Cursor、ClatHubCopilot这些工具",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 64,
+   "index": 236,
+   "start": 497.7,
+   "before": "有人一个月烧掉价值上万的Totem",
+   "after": "有人一个月烧掉价值上万的TOKEN",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 65,
+   "index": 237,
+   "start": 500.26,
+   "before": "还找不定一个项目",
+   "after": "还搞不定一个项目",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 66,
+   "index": 240,
+   "start": 506.34,
+   "before": "如果你想少踩车",
+   "after": "如果你想少踩坑",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 67,
+   "index": 246,
+   "start": 518.74,
+   "before": "MCP Server和Agent Steels",
+   "after": "MCP Server和Agent Skills",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 68,
+   "index": 253,
+   "start": 535.82,
+   "before": "WebCoding是当下最流行的AI编程范式",
+   "after": "VibebCoding是当下最流行的Al编程范式",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 69,
+   "index": 254,
+   "start": 538.98,
+   "before": "STD是规范驱动的开发模式",
+   "after": "SDD是规范驱动的开发模式",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 70,
+   "index": 255,
+   "start": 541.86,
+   "before": "Hernes Engineering是更系统化的AI工程实践",
+   "after": "HarnessEngineering是更系统化的AI工程实践",
+   "verdict": "ok",
+   "reason": "fmt"
+  },
+  {
+   "seq": 71,
+   "index": 257,
+   "start": 546.3,
+   "before": "面试专会知道",
+   "after": "面试官会知道",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 72,
+   "index": 289,
+   "start": 615.08,
+   "before": "我建议用异行化",
+   "after": "我建议用一行话",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 73,
+   "index": 291,
+   "start": 619.64,
+   "before": "比如贴着产品访问地址",
+   "after": "比如贴个产品访问地址",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 74,
+   "index": 292,
+   "start": 621.44,
+   "before": "列出日活多少",
+   "after": "列出回活多少",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 75,
+   "index": 300,
+   "start": 635.58,
+   "before": "和一个只有你自己在用的个人项目",
+   "after": "和一个只有你自已在用的个人项目",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 76,
+   "index": 303,
+   "start": 643.16,
+   "before": "也可以补一个脱米后的文档地址",
+   "after": "也可以补一个脱敏后的文档地址",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 77,
+   "index": 304,
+   "start": 645.8,
+   "before": "里面放一些成果截图、用户评价",
+   "after": "里面放一些成果截图啊",
+   "verdict": "wrong",
+   "reason": "loss"
+  },
+  {
+   "seq": 78,
+   "index": 313,
+   "start": 667.6,
+   "before": "1.架构设计能力",
+   "after": "维度一：架构设计能力",
+   "verdict": "ok",
+   "reason": "fmt"
+  },
+  {
+   "seq": 79,
+   "index": 320,
+   "start": 683.2,
+   "before": "而是自己设计过一种系统的架构",
+   "after": "而是自已设计过一个系统的架构",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 80,
+   "index": 322,
+   "start": 688.88,
+   "before": "比如特律模式加工厂模式解决多渠道支付适配",
+   "after": "比如策略模式加工厂模式解决多渠道支付适配",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 81,
+   "index": 326,
+   "start": 697.72,
+   "before": "任何一个需要你做技术选行",
+   "after": "任何一个需要你做技术选型",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 82,
+   "index": 329,
+   "start": 703.56,
+   "before": "关键是让面试端看到",
+   "after": "关键是让面试官看到",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 83,
+   "index": 341,
+   "start": 731.02,
+   "before": "第三点是运为和问题解决能力",
+   "after": "维度三：运维和问题解决能力",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 84,
+   "index": 343,
+   "start": 735.1,
+   "before": "从来不会提到监控和运为相关的内容",
+   "after": "从来不会提到监控和运维相关的内容",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 85,
+   "index": 347,
+   "start": 741.54,
+   "before": "你要对自己写的代码负责到底",
+   "after": "你要对自已写的代码负责到底",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 86,
+   "index": 348,
+   "start": 743.78,
+   "before": "包括上线之后的监控、告紧、问题排查",
+   "after": "包括上线之后的监控、告警问题排查",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 87,
+   "index": 350,
+   "start": 749.06,
+   "before": "面试官会觉得你是一段靠谱的",
+   "after": "面试官会觉得你是一个靠谱的",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 88,
+   "index": 351,
+   "start": 751.14,
+   "before": "可以独当一面的人",
+   "after": "可观测性体系，配置核心业务指标告警规则，线上问题平均定位时间从30分钟缩短至5分钟 个人信息 对代码负责到底：监控、告警、问题排查→靠谱、独当一面的人",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 89,
+   "index": 364,
+   "start": 778.42,
+   "before": "也就是AI热点监控工具",
+   "after": "一个是AI热点监控工具",
+   "verdict": "neutral",
+   "reason": "loss"
+  },
+  {
+   "seq": 90,
+   "index": 366,
+   "start": 783.16,
+   "before": "但是测重点完全不同",
+   "after": "但是侧重点完全不同",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 91,
+   "index": 367,
+   "start": 785.2,
+   "before": "比如AI超级智能体",
+   "after": "项目·AI超级智能体",
+   "verdict": "ok",
+   "reason": "fmt"
+  },
+  {
+   "seq": 92,
+   "index": 368,
+   "start": 786.68,
+   "before": "是测重传统佳娃后端技术",
+   "after": "是侧重传统Java后端技术",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 93,
+   "index": 369,
+   "start": 788.88,
+   "before": "和AI应用开发的结合",
+   "after": "和Al应用开发的结合",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 94,
+   "index": 370,
+   "start": 790.76,
+   "before": "体现的是RIG MCP智能体架构",
+   "after": "体现的是RAG、MCP智能体架构",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 95,
+   "index": 373,
+   "start": 798.12,
+   "before": "测重的是AI编程能力",
+   "after": "AI热点监控工具侧重的是AI编程能力",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 96,
+   "index": 375,
+   "start": 802.24,
+   "before": "体现的是用WebCoding的方式",
+   "after": "体现的是用vibebCoding的方式",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 97,
+   "index": 377,
+   "start": 806.28,
+   "before": "到开发上限",
+   "after": "到开发上线",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 98,
+   "index": 388,
+   "start": 830.96,
+   "before": "附上可访问的地址和Datab",
+   "after": "附上可访问的地址和GitHub",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 99,
+   "index": 395,
+   "start": 844.64,
+   "before": "面试端凭什么相信这是你做的呢",
+   "after": "面试官凭什么相信这是你做的呢",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 100,
+   "index": 397,
+   "start": 849.8,
+   "before": "在面试端看来是两个完全不同的层次",
+   "after": "本地跑通vS部署上线给用户用→面试官看来是两个完全不同的层次",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 101,
+   "index": 400,
+   "start": 856.48,
+   "before": "比如API调用成本降低60%",
+   "after": "通过多模型路由策略和Prompt缓存机制，API调用成本降低60%",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 102,
+   "index": 410,
+   "start": 878.36,
+   "before": "不然面试端觉得假的话",
+   "after": "不然面试官觉得假的话",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 103,
+   "index": 416,
+   "start": 886.64,
+   "before": "你用jmeter工具点几下",
+   "after": "你用JMeter工具点几下",
+   "verdict": "ok",
+   "reason": "fmt"
+  },
+  {
+   "seq": 104,
+   "index": 419,
+   "start": 891.08,
+   "before": "你可以找着AI帮你设计测试方案啊",
+   "after": "也可以找个AI帮你设计测试方案啊",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 105,
+   "index": 421,
+   "start": 897.24,
+   "before": "比如通过Tooltron Text上下文传递用户身份信息",
+   "after": "“通过ToolContext上下文传递用户身份信息",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 106,
+   "index": 422,
+   "start": 901.02,
+   "before": "减和参数教验",
+   "after": "“通过ToolContext上下文传递用户身份信息，结合参数校验",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 107,
+   "index": 425,
+   "start": 907.28,
+   "before": "解决的问题和效果",
+   "after": "解决的问题+效果",
+   "verdict": "neutral",
+   "reason": "fmt"
+  },
+  {
+   "seq": 108,
+   "index": 426,
+   "start": 908.86,
+   "before": "写得很具体",
+   "after": "写的很具体",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 109,
+   "index": 438,
+   "start": 933.7,
+   "before": "我自己不会写代码啊",
+   "after": "我自已不会写代码啊",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 110,
+   "index": 443,
+   "start": 946.18,
+   "before": "需求分析、方案设计、技术选行、测试验证、上线部署",
+   "after": "需求分析、方案设计、技术选型、测试验证、上线部署",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 111,
+   "index": 450,
+   "start": 963.5,
+   "before": "怎么平衡信息负债面和精确度之间的矛盾",
+   "after": "怎么平衡信息覆盖面和精确度之间的矛盾",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 112,
+   "index": 451,
+   "start": 966.98,
+   "before": "这些都需要你自己去思考和做取舍",
+   "after": "这些都需要你自已去思考和做取舍",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 113,
+   "index": 452,
+   "start": 970.02,
+   "before": "这个项目的另一个亮点是Agent Steels的封装",
+   "after": "这个项目的另一个亮点是Agent Skills的封装",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 114,
+   "index": 453,
+   "start": 973.5,
+   "before": "利用Steels Creator将热点监控能力",
+   "after": "利用SkillCreator将热点监控能力",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 115,
+   "index": 454,
+   "start": 975.9,
+   "before": "封装为标准化的Agent Steels技能包",
+   "after": "封装为标准化的Agent Skills技能包",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 116,
+   "index": 461,
+   "start": 991.86,
+   "before": "只是让他帮自己写代码",
+   "after": "只是让它帮自已写代码",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 117,
+   "index": 467,
+   "start": 1001.94,
+   "before": "再看一下其他的个人作品",
+   "after": "再着些下其他的个人作品",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 118,
+   "index": 468,
+   "start": 1003.82,
+   "before": "一般工作经验三年以下的同学",
+   "after": "一般工作经验3年以下的同学",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 119,
+   "index": 469,
+   "start": 1006.02,
+   "before": "简历上重点写一到三个项目",
+   "after": "简仿上重点写13个项自就够了",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 120,
+   "index": 472,
+   "start": 1011.34,
+   "before": "但如果你做过更多的项目",
+   "after": "但始桌你做过更多的项自",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 121,
+   "index": 473,
+   "start": 1013.18,
+   "before": "可以用一个其他个人作品板块来展示",
+   "after": "可政用养其他个人作品板块来展示",
+   "verdict": "wrong",
+   "reason": "ocr"
+  },
+  {
+   "seq": 122,
+   "index": 474,
+   "start": 1016.46,
+   "before": "每个项目一行化",
+   "after": "每个项目一行话：技术栈+核心亮点",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 123,
+   "index": 475,
+   "start": 1017.86,
+   "before": "点名技术站和核心亮点",
+   "after": "点明技术栈和核心亮点",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 124,
+   "index": 478,
+   "start": 1023.14,
+   "before": "指向了我的个人作品及网站",
+   "after": "指向了我的个人作品集网站",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 125,
+   "index": 484,
+   "start": 1034.34,
+   "before": "面试专扫一眼这个板块",
+   "after": "面试官扫一眼这个板块",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 126,
+   "index": 488,
+   "start": 1043.06,
+   "before": "有微服务架构的",
+   "after": "·API开放平台：SpringCloud微服务架构+Gateway网关+自定义SDK",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 127,
+   "index": 491,
+   "start": 1046.66,
+   "before": "每个项目的测重点都不同",
+   "after": "每个项目的侧重点都不同",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 128,
+   "index": 500,
+   "start": 1067.86,
+   "before": "也很能拉拆和其他候选人的差距",
+   "after": "也很能拉开和其他候选人的差距",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 129,
+   "index": 501,
+   "start": 1070.38,
+   "before": "因为很多面试官喜欢炒茶候选人",
+   "after": "因为很多面试官喜欢考察候选人",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 130,
+   "index": 507,
+   "start": 1081.82,
+   "before": "最后这个版串的核心原则是",
+   "after": "最后这个板块的核心原则是",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 131,
+   "index": 512,
+   "start": 1093.78,
+   "before": "我善于团聚协作",
+   "after": "我善于团队协作",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 132,
+   "index": 522,
+   "start": 1108.74,
+   "before": "已上线十多个可访问产品",
+   "after": "已上线10多个可访问产品",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 133,
+   "index": 523,
+   "start": 1111.26,
+   "before": "每个产品还真的能打拆访问",
+   "after": "每个产品还真的能打开访问",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 134,
+   "index": 525,
+   "start": 1115.02,
+   "before": "后面跟着两万多个关注者",
+   "after": "后面跟着2万多个关注者",
+   "verdict": "ok",
+   "reason": "norm"
+  },
+  {
+   "seq": 135,
+   "index": 526,
+   "start": 1117.54,
+   "before": "单个项目有1万史大",
+   "after": "单个项目有1万star",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 136,
+   "index": 535,
+   "start": 1133.58,
+   "before": "把中间藏给项目经历",
+   "after": "把空间腾给项目经历",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 137,
+   "index": 548,
+   "start": 1154.6,
+   "before": "你这对新技术保持好奇心的程序员",
+   "after": "一个对新技术保持好奇心的程序员",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 138,
+   "index": 549,
+   "start": 1157.08,
+   "before": "成长速度一定比顾不自封的人快得多",
+   "after": "成长速度一定比固步自封的人快得多",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 139,
+   "index": 564,
+   "start": 1184.98,
+   "before": "要能独立拆发项目",
+   "after": "要能独立开发项目",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 140,
+   "index": 570,
+   "start": 1190.9,
+   "before": "要知道OpenClaw小龙虾",
+   "after": "要知道openclaw小龙虾",
+   "verdict": "neutral",
+   "reason": "fmt"
+  },
+  {
+   "seq": 141,
+   "index": 572,
+   "start": 1194.58,
+   "before": "一个只会接受指令干活的人",
+   "after": "一个只会接收指令干活的人",
+   "verdict": "neutral",
+   "reason": "score"
+  },
+  {
+   "seq": 142,
+   "index": 576,
+   "start": 1203.58,
+   "before": "你写的每一条技能",
+   "after": "和企业需求双向匹配→对标JD写的每一条技能",
+   "verdict": "bleed",
+   "reason": "dup"
+  },
+  {
+   "seq": 143,
+   "index": 582,
+   "start": 1213.68,
+   "before": "需要会监控运为的人",
+   "after": "需要会监控运维的人",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 144,
+   "index": 584,
+   "start": 1218.24,
+   "before": "最后再让我多逼比几句啊",
+   "after": "最后再让我多比比几句啊",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 145,
+   "index": 602,
+   "start": 1259.8,
+   "before": "别等到求之前才开始",
+   "after": "别等到求职前才开始",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 146,
+   "index": 606,
+   "start": 1266.7,
+   "before": "就回来征新一下你的简历",
+   "after": "就回来更新一下你的简历",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 147,
+   "index": 609,
+   "start": 1273.0,
+   "before": "那如果你想征系统的学习写简历的方法",
+   "after": "那如果你想更系统的学习写简历的方法",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 148,
+   "index": 618,
+   "start": 1289.7,
+   "before": "换着视角看看别人的简历",
+   "after": "换个视角看看别人的简历",
+   "verdict": "ok",
+   "reason": "score"
+  },
+  {
+   "seq": 149,
+   "index": 623,
+   "start": 1298.4,
+   "before": "这将是我持续争新创作的最大动力",
+   "after": "这将是我持续更新创作的最大动力",
+   "verdict": "ok",
+   "reason": "score"
+  }
+ ]
+}

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>video-extract · 视频内容提取</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --text:#1c2024; --dim:#6b7280;
+    --brand:#4f46e5; --brand-soft:#eef0ff; --ok:#0f9d58; --warn:#d97706; --err:#dc2626;
+    --speech:#2563eb; --screen:#7c3aed; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;
+         display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .sub{color:var(--dim);font-size:12px}
+  .badge{margin-left:auto;font-size:12px;padding:3px 10px;border-radius:20px;
+         background:var(--brand-soft);color:var(--brand)}
+  .badge.off{background:#fef2f2;color:var(--err)}
+  main{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;align-items:start}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h2{font-size:13px;margin:0 0 12px;color:var(--dim);font-weight:600;letter-spacing:.4px}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+  input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);
+        border-radius:7px;font:inherit;background:#fff}
+  input[type=text]:focus,select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:13px}
+  .chk input{width:16px;height:16px;accent-color:var(--brand)}
+  .chk span.hint{color:var(--dim);font-size:11px}
+  button{border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
+  button.primary{background:var(--brand);color:#fff;width:100%;margin-top:14px}
+  button.primary:disabled{background:#c7c9d9;cursor:not-allowed}
+  button.ghost{background:var(--brand-soft);color:var(--brand);font-size:12px;padding:6px 12px}
+  .jobs{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
+  .job{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+       font-size:12px;cursor:pointer;border:1px solid transparent}
+  .job:hover{background:var(--bg)}
+  .job.active{background:var(--brand-soft);border-color:var(--brand)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#cbd5e1;flex:none}
+  .dot.running{background:var(--brand);animation:pulse 1.2s infinite}
+  .dot.done{background:var(--ok)} .dot.failed{background:var(--err)}
+  @keyframes pulse{50%{opacity:.35}}
+  .job .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 进度 */
+  .bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 8px}
+  .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6366f1,#8b5cf6);
+         transition:width .4s}
+  .stage{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+  .stage b{color:var(--text);font-weight:600}
+  pre.log{margin:10px 0 0;max-height:190px;overflow:auto;background:#0f172a;color:#cbd5e1;
+          border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;
+          line-height:1.55;white-space:pre-wrap}
+  /* Tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 14px}
+  .tab{padding:8px 14px;font-size:13px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent}
+  .tab.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+  .pane{display:none} .pane.on{display:block}
+  /* 统计 */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+  .stat{background:var(--bg);border-radius:8px;padding:10px 12px}
+  .stat .v{font-size:19px;font-weight:700;font-family:var(--mono)}
+  .stat .k{font-size:11px;color:var(--dim);margin-top:2px}
+  .stat.warn .v{color:var(--warn)}
+  /* 时间轴 */
+  .tl{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .tl .it{display:flex;gap:10px;padding:7px 12px;border-bottom:1px solid #f1f3f5;font-size:13px}
+  .tl .it:last-child{border-bottom:0}
+  .tl .it:hover{background:#fafbfc}
+  .tl .t{font-family:var(--mono);font-size:11.5px;color:var(--dim);flex:none;padding-top:2px}
+  .tl .tag{flex:none;font-size:10px;padding:1px 7px;border-radius:20px;height:18px;line-height:16px}
+  .tag.speech{background:#e8f0fe;color:var(--speech)}
+  .tag.screen{background:#f3e8ff;color:var(--screen)}
+  .tl .tx{flex:1}
+  /* 校对对比 */
+  .diff{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+  .diff .h{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-bottom:6px;
+           display:flex;justify-content:space-between}
+  .diff .b{color:var(--dim)}
+  .diff .a{color:var(--text);font-weight:500}
+  .diff .a .hl{background:#dcfce7;color:#166534;border-radius:3px;padding:0 2px}
+  .diff.bleed{border-color:#fecaca;background:#fff7f7}
+  .pill{font-size:10px;padding:1px 8px;border-radius:20px;background:#fee2e2;color:var(--err)}
+  /* 文件 */
+  .file{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+        border-radius:8px;margin-bottom:6px;font-size:13px}
+  .file .n{flex:1;font-family:var(--mono)}
+  .file .s{color:var(--dim);font-size:11.5px}
+  a.dl{color:var(--brand);text-decoration:none;font-weight:600;font-size:12px}
+  /* 总结 */
+  .md h2{font-size:15px;margin:16px 0 8px} .md h3{font-size:14px;margin:14px 0 6px}
+  .md ul,.md ol{margin:6px 0;padding-left:22px} .md li{margin:3px 0}
+  .md code{background:var(--bg);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
+  .empty{color:var(--dim);font-size:13px;text-align:center;padding:40px 0}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;
+       padding:10px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>video-extract</h1>
+  <span class="sub">视频 → 可检索的文字：语音转写 · 画面文字 · 字幕校对 · LLM 总结</span>
+  <span class="badge" id="health">连接中…</span>
+</header>
+
+<main>
+  <!-- 左：参数 -->
+  <section class="card">
+    <h2>新建任务</h2>
+    <label>视频来源</label>
+    <input type="text" id="source" placeholder="B站/YouTube 链接，或服务器上的文件路径">
+    <div class="row">
+      <div>
+        <label>Whisper 模型</label>
+        <select id="model">
+          <option>tiny</option><option>base</option><option>small</option>
+          <option selected>medium</option><option>large-v3</option>
+        </select>
+      </div>
+      <div>
+        <label>语言</label>
+        <select id="lang">
+          <option value="">自动检测</option><option value="zh" selected>中文</option>
+          <option value="en">英文</option><option value="ja">日文</option>
+        </select>
+      </div>
+    </div>
+
+    <label>画面文字（OCR）</label>
+    <div class="row">
+      <select id="ocr_region">
+        <option value="full" selected>全画面</option>
+        <option value="bottom">仅底部字幕带（快）</option>
+        <option value="top">仅顶部</option>
+      </select>
+      <input type="text" id="ocr_interval" value="2" title="抽帧间隔（秒）">
+    </div>
+
+    <div class="chk"><input type="checkbox" id="ocr" checked><span>开启画面文字识别</span></div>
+    <div class="chk"><input type="checkbox" id="repair" checked>
+      <span>用硬字幕校对 ASR 错字 <span class="hint">（核心能力）</span></span></div>
+    <div class="chk"><input type="checkbox" id="summarize">
+      <span>LLM 生成结构化总结 <span class="hint">（需 OPENAI_API_KEY）</span></span></div>
+    <div class="chk"><input type="checkbox" id="reuse" checked>
+      <span>复用已有中间结果 <span class="hint">（同一视频重跑时秒级完成）</span></span></div>
+    <input type="text" id="summary_model" value="gpt-4o-mini" style="margin-top:6px"
+           title="总结用的模型名">
+
+    <button class="primary" id="run">开始提取</button>
+
+    <h2 style="margin-top:20px">历史任务</h2>
+    <div class="jobs" id="jobs"><div class="empty" style="padding:14px 0">暂无</div></div>
+  </section>
+
+  <!-- 右：进度 + 结果 -->
+  <section class="card">
+    <div id="progressWrap" style="display:none">
+      <h2>处理进度</h2>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="stage"><b id="pct">0%</b><span id="stageMsg">等待中</span></div>
+      <pre class="log" id="log"></pre>
+    </div>
+    <div id="errBox"></div>
+    <div id="resultWrap" style="display:none">
+      <div class="stats" id="stats"></div>
+      <div class="tabs">
+        <div class="tab on" data-pane="p-summary">智能总结</div>
+        <div class="tab" data-pane="p-timeline">时间轴</div>
+        <div class="tab" data-pane="p-diff">校对对比</div>
+        <div class="tab" data-pane="p-files">文件</div>
+      </div>
+      <div class="pane on" id="p-summary"><div class="md" id="summary"></div></div>
+      <div class="pane" id="p-timeline">
+        <div style="margin-bottom:8px">
+          <button class="ghost" data-filter="all">全部</button>
+          <button class="ghost" data-filter="speech">仅语音</button>
+          <button class="ghost" data-filter="screen">仅画面文字</button>
+        </div>
+        <div class="tl" id="timeline"></div>
+      </div>
+      <div class="pane" id="p-diff"></div>
+      <div class="pane" id="p-files"></div>
+    </div>
+    <div class="empty" id="placeholder">提交任务后在这里查看进度与结果</div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (p, opt) => fetch(p, opt).then(async r => {
+  if (!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail || r.statusText);
+  return r.json();
+});
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KB'
+                        : (n/1048576).toFixed(1) + ' MB';
+
+// ---- 健康状态 ----
+async function ping(){
+  try{
+    const h = await api('/api/health');
+    $('health').textContent = h.llm_configured ? '服务正常 · LLM 已配置' : '服务正常 · 未配 LLM Key';
+    $('health').className = 'badge' + (h.llm_configured ? '' : ' off');
+  }catch(e){
+    $('health').textContent = '服务不可用';
+    $('health').className = 'badge off';
+  }
+}
+ping(); setInterval(ping, 15000);
+
+// ---- 提交任务 ----
+let current = null, timer = null;
+$('run').onclick = async () => {
+  const src = $('source').value.trim();
+  if(!src) return alert('请填写视频链接或路径');
+  const body = {
+    source: src,
+    model: $('model').value,
+    lang: $('lang').value || null,
+    ocr: $('ocr').checked,
+    ocr_region: $('ocr_region').value,
+    ocr_interval: parseFloat($('ocr_interval').value) || 2,
+    repair: $('repair').checked,
+    summarize: $('summarize').checked,
+    summary_model: $('summary_model').value.trim() || 'gpt-4o-mini',
+    reuse: $('reuse').checked
+  };
+  $('run').disabled = true;
+  $('errBox').innerHTML = '';
+  try{
+    const job = await api('/api/jobs', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    watch(job.id);
+  }catch(e){
+    $('errBox').innerHTML = '<div class="err">提交失败：' + esc(e.message) + '</div>';
+    $('run').disabled = false;
+  }
+};
+
+function watch(id){
+  current = id;
+  $('placeholder').style.display = 'none';
+  $('resultWrap').style.display = 'none';
+  $('progressWrap').style.display = 'block';
+  clearInterval(timer);
+  timer = setInterval(poll, 1000);
+  poll();
+  loadJobs();
+}
+
+async function poll(){
+  if(!current) return;
+  let j;
+  try{ j = await api('/api/jobs/' + current); }catch(e){ return; }
+  $('bar').style.width = j.pct + '%';
+  $('pct').textContent = j.pct + '%';
+  $('stageMsg').textContent = j.message + (j.stage ? '  ·  ' + j.stage : '');
+  $('log').textContent = (j.log || []).join('\n');   // 每条日志一行
+  $('log').scrollTop = $('log').scrollHeight;
+  if(j.status === 'done'){
+    clearInterval(timer); $('run').disabled = false;
+    await showResult(id);
+    loadJobs();
+  }else if(j.status === 'failed'){
+    clearInterval(timer); $('run').disabled = false;
+    $('errBox').innerHTML = '<div class="err">' + esc(j.error || '处理失败') + '</div>';
+    loadJobs();
+  }
+}
+
+// ---- 结果渲染 ----
+async function showResult(id){
+  const r = await api('/api/jobs/' + id + '/result');
+  const s = r.stats;
+  $('stats').innerHTML = [
+    ['语音片段', s.speech_segments, ''], ['画面文字', s.screen_items, ''],
+    ['校对修正', s.repaired, ''], ['疑似整行灌入', s.bleed, s.bleed ? 'warn' : ''],
+    ['时长', s.duration, '']
+  ].map(([k,v,cls]) => `<div class="stat ${cls}"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+
+  $('summary').innerHTML = r.summary ? md(r.summary)
+    : '<div class="empty">未生成总结（提交时勾选「LLM 生成结构化总结」）</div>';
+
+  renderTimeline(r.timeline, 'all');
+
+  $('p-diff').innerHTML = r.repair_diff.length
+    ? r.repair_diff.map(d => `
+        <div class="diff ${d.bleed ? 'bleed' : ''}">
+          <div class="h"><span>${esc(fmtTs(d.start))}</span>
+            ${d.bleed ? '<span class="pill">疑似整行灌入</span>' : ''}</div>
+          <div class="b">${esc(d.before)}</div>
+          <div class="a">→ ${diffHtml(d.before, d.after)}</div>
+        </div>`).join('')
+    : '<div class="empty">本次没有需要修正的片段</div>';
+
+  $('p-files').innerHTML = r.files.map(f => `
+    <div class="file"><span class="n">${esc(f.name)}</span>
+      <span class="s">${fmtSize(f.size)}</span>
+      <a class="dl" href="/api/jobs/${esc(id)}/files/${encodeURIComponent(f.name)}">下载</a></div>`).join('');
+
+  $('resultWrap').style.display = 'block';
+}
+
+function fmtTs(t){
+  t = Math.max(0, Math.floor(t));
+  const h = String(Math.floor(t/3600)).padStart(2,'0');
+  const m = String(Math.floor(t%3600/60)).padStart(2,'0');
+  return h + ':' + m + ':' + String(t%60).padStart(2,'0');
+}
+
+// 极简 markdown：先转义再套标签，避免注入
+function md(src){
+  const out = [];
+  let list = null;
+  const closeList = () => { if(list){ out.push('</'+list+'>'); list = null; } };
+  for(const raw of esc(src).split('\n')){
+    const line = raw.trimEnd();
+    let m;
+    if((m = line.match(/^#{2,3}\s+(.*)$/))){ closeList(); out.push(`<h3>${m[1]}</h3>`); }
+    else if((m = line.match(/^\s*[-*]\s+(.*)$/))){ if(list!=='ul'){closeList();list='ul';out.push('<ul>');} out.push(`<li>${m[1]}</li>`); }
+    else if((m = line.match(/^\s*\d+[.、)]\s+(.*)$/))){ if(list!=='ol'){closeList();list='ol';out.push('<ol>');} out.push(`<li>${m[1]}</li>`); }
+    else if(!line.trim()){ closeList(); }
+    else { closeList(); out.push(`<p>${line}</p>`); }
+  }
+  closeList();
+  return out.join('\n').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+// 字符级 diff：高亮校对后新增/变化的部分
+function diffHtml(before, after){
+  const a = esc(before), b = esc(after);
+  let i = 0;
+  while(i < a.length && i < b.length && a[i] === b[i]) i++;
+  let j = 0;
+  while(j < a.length - i && j < b.length - i && a[a.length-1-j] === b[b.length-1-j]) j++;
+  const head = b.slice(0, i);
+  const mid  = b.slice(i, b.length - j);
+  const tail = j ? b.slice(b.length - j) : '';
+  return head + (mid ? `<span class="hl">${mid}</span>` : '') + tail;
+}
+
+let timelineData = [];
+function renderTimeline(items, filter){
+  timelineData = items;
+  const list = items.filter(x => filter === 'all' || x.kind === filter);
+  $('timeline').innerHTML = list.length ? list.map(x => `
+    <div class="it">
+      <span class="t">${esc(x.ts)}</span>
+      <span class="tag ${x.kind}">${x.kind === 'speech' ? '语音' : '画面'}</span>
+      <span class="tx">${esc(x.text)}</span>
+    </div>`).join('') : '<div class="empty">无内容</div>';
+}
+document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () =>
+  renderTimeline(timelineData, b.dataset.filter));
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  $(t.dataset.pane).classList.add('on');
+});
+
+// ---- 历史任务 ----
+async function loadJobs(){
+  let data; try{ data = await api('/api/jobs'); }catch(e){ return; }
+  if(!data.jobs.length){ $('jobs').innerHTML = '<div class="empty" style="padding:14px 0">暂无</div>'; return; }
+  $('jobs').innerHTML = data.jobs.map(j => `
+    <div class="job ${j.id===current?'active':''}" data-id="${j.id}">
+      <span class="dot ${j.status}"></span>
+      <span class="nm" title="${esc(j.source)}">${esc(j.title || j.source)}</span>
+      <span style="color:var(--dim)">${j.status==='done' ? Math.round(j.pct)+'%' : esc(j.stage||j.status)}</span>
+    </div>`).join('');
+  document.querySelectorAll('.job').forEach(el => el.onclick = async () => {
+    const id = el.dataset.id;
+    const j = await api('/api/jobs/' + id);
+    if(j.status === 'done'){ current = id; $('progressWrap').style.display='none';
+      $('placeholder').style.display='none'; await showResult(id); loadJobs(); }
+    else if(j.status === 'running' || j.status === 'queued'){ watch(id); }
+    else { $('errBox').innerHTML = '<div class="err">' + esc(j.error||'失败') + '</div>'; }
+  });
+}
+loadJobs();
+</script>
+</body>
+</html>
