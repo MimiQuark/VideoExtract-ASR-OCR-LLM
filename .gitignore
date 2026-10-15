@@ -2,9 +2,10 @@
 __pycache__/
 *.py[cod]
 
-# 大体积中间产物：视频与抽帧
-output/_download/
-output/**/frames/
+# 运行时产物：视频、抽帧，以及用户处理的其它视频结果
+# 只保留 README 第十四~十五节引用的那个实测案例，其余不入库
+output/*
+!output/时隔六年*/
 *.wav
 
 # 可重新获取的二进制（setup.ps1 / imageio-ffmpeg 都能装回来，不必进版本库）
