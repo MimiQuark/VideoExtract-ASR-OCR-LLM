@@ -153,16 +153,6 @@ def _on_log(job: Job, msg: str) -> None:
             del job.log[:MAX_LOG_LINES]
 
 
-def _find_out_dir(source: str) -> Path | None:
-    """定位本次任务的输出目录（OUT_ROOT 下最新的、非 _download 的目录）。"""
-    if not OUT_ROOT.exists():
-        return None
-    cands = [p for p in OUT_ROOT.iterdir() if p.is_dir() and not p.name.startswith("_")]
-    if not cands:
-        return None
-    return max(cands, key=lambda p: p.stat().st_mtime)
-
-
 def _run_job(job: Job) -> None:
     job.status = "running"
     job.started_at = _now()
@@ -178,8 +168,9 @@ def _run_job(job: Job) -> None:
         control.check()
         extract.require_ffmpeg()
         args = extract.build_parser().parse_args(argv_from_options(job.source, job.options))
-        extract.process(job.source, OUT_ROOT, args)
-        out_dir = _find_out_dir(job.source)
+        # process() 直接返回产物目录 —— 原先靠"output/ 下最新的目录"来猜，
+        # 多任务并行时会张冠李戴（实测：21 分钟的视频挂上了另一个视频的统计）
+        out_dir = extract.process(job.source, OUT_ROOT, args)
         job.out_dir = str(out_dir) if out_dir else ""
         job.status = "done"
         job.pct = 100

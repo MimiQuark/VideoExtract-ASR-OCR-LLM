@@ -865,7 +865,7 @@ def build_report(title: str, source: str, speech: list[Speech], screen: list[Scr
 
 # ----------------------------------------------------------------------------- 主流程
 
-def process(source: str, out_root: Path, args) -> None:
+def process(source: str, out_root: Path, args) -> Path:
     stage("resolve", 3, f"解析输入: {source}")
     work = Path(source).expanduser()
     log(f"\n{'=' * 68}")
@@ -1001,6 +1001,9 @@ def process(source: str, out_root: Path, args) -> None:
     stage("report", 95, "生成报告…")
     build_report(title, source, speech, screen, summary, lang_note or "无", out, repaired)
     stage("done", 100, "完成")
+    # 返回真实输出目录：调用方（Web 服务）必须知道产物写在哪，
+    # 不能靠扫描 output/ 猜"最新目录"——多任务并行时会认错。
+    return out
     log(f"\n✅ 完成 -> {out}")
     log(f"   report.md        汇总报告(时间轴+总结)")
     log(f"   transcript.srt   字幕文件")
