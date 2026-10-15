@@ -421,6 +421,29 @@ if STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
+def _port_open(host: str, port: int) -> bool:
+    """端口上是否已有程序在监听。"""
+    import socket
+    with socket.socket() as sock:
+        sock.settimeout(0.6)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _is_our_service(url: str) -> bool:
+    """确认占用端口的是本服务，而不是别的程序。
+
+    只看"端口被占"是不够的——用户很可能同时开着别的项目（本项目默认 8000，
+    同类工具也常用 8000），必须能区分开再决定是"直接打开"还是"报错换端口"。
+    """
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url + "/api/health", timeout=1.5) as resp:
+            data = json.load(resp)
+        return data.get("status") == "ok" and "queue_size" in data
+    except Exception:
+        return False
+
+
 def _open_browser_when_ready(url: str, tries: int = 60) -> None:
     """轮询健康检查，服务真的起来之后再打开浏览器。
 
@@ -456,6 +479,20 @@ if __name__ == "__main__":
     a = ap.parse_args()
 
     url = f"http://{a.host}:{a.port}"
+
+    # 端口已被占用时的处理：分成"本服务已在跑"和"别的程序占着"两种情况
+    if _port_open(a.host, a.port):
+        if _is_our_service(url):
+            print(f"\n  端口 {a.port} 上已有本服务在运行，直接打开界面。\n  {url}\n")
+            import webbrowser
+            webbrowser.open(url)
+            raise SystemExit(0)
+        print(f"\n  [错误] 端口 {a.port} 已被其他程序占用。\n"
+              f"  解决办法（任选其一）:\n"
+              f"    1) 换一个端口:  python server.py --port 8010      （双击启动则 start.bat --port 8010）\n"
+              f"    2) 先结束占用 {a.port} 的程序，再重新启动\n")
+        raise SystemExit(1)
+
     print(f"\n  界面地址: {url}\n  按 Ctrl+C 停止服务\n")
     if a.open:
         threading.Thread(target=_open_browser_when_ready, args=(url,), daemon=True).start()
