@@ -442,6 +442,32 @@ python server.py                         # http://127.0.0.1:8000
 * **参数复用同一套定义**：界面参数先翻译成 CLI 参数，再交给
   `extract.build_parser()` 解析——以后加 CLI 参数，前端不会漏。
 
+### 任务控制：暂停 / 继续 / 停止
+
+界面上有三个按钮，后端对应三个端点：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/jobs/{id}/pause` | 请求暂停 |
+| POST | `/api/jobs/{id}/resume` | 恢复运行 |
+| POST | `/api/jobs/{id}/cancel` | 停止（排队中/暂停中同样可停） |
+
+**生效粒度**是"检查点"——转写的每个分段、OCR 的每一帧、下载的每次进度回调、
+以及各阶段之间。因为 ASR/OCR 都是第三方库里的阻塞调用，无法从外部中断单次推理，
+所以用协作式检查点实现：
+
+```
+实测：暂停后进度立即冻结；恢复后继续；
+      停止在 ASR 阶段约 9 秒内生效（延迟 = 距离下一个分段边界的时间），
+      终态后再操作返回 409。
+```
+
+**两条已知限制**（都已写进界面提示）：
+
+1. **暂停会占用唯一的工作线程**，暂停期间其他任务排队等待——直接"停止"才是释放办法。
+2. **首次使用某个 Whisper 模型时会联网下载**（medium 约 1.5GB），下载过程无法中断，
+   取消请求会在下载结束后、进入下一阶段时生效。
+
 ### 接口
 
 | 方法 | 路径 | 说明 |
@@ -458,3 +484,67 @@ python server.py                         # http://127.0.0.1:8000
 ```
 非法路径 400 · 不存在的任务 404 · 未完成取结果 409 · 目录穿越 404
 ```
+
+---
+
+## 十七、配置模型（三类，别混）
+
+这个项目里的"模型"指三件不同的东西：
+
+| 类型 | 用途 | 怎么配 | 必须吗 |
+|---|---|---|---|
+| **ASR 模型** | 语音转写 | 界面下拉框 / CLI `--model` | 必用（有现成字幕轨时可跳过） |
+| **LLM 模型** | 生成结构化总结 | 环境变量 + `--summary-model` | 可选 |
+| **OCR** | 画面文字识别 | 无需配置（RapidOCR 内置） | 可选 |
+
+### 1. ASR 模型（语音转写）
+
+```powershell
+python extract.py "视频.mp4" --model large-v3 --lang zh
+```
+
+| 档位 | 速度 | 说明 |
+|---|---|---|
+| tiny / base / small | 快 | 试跑用 |
+| **medium**（默认） | 中 | 中文日常够用 |
+| large-v3 | 慢 | 数字、英文缩写、专业术语明显更准 |
+
+**首次使用某个档位会联网下载模型**（medium 约 1.5GB，只下一次）。
+国内务必先配镜像，否则会卡在下载并最终超时：
+
+```powershell
+$env:HF_ENDPOINT = "https://hf-mirror.com"
+$env:HF_HUB_DISABLE_XET = "1"     # 镜像不代理新版 Xet 存储，必须同时禁用
+```
+
+### 2. LLM 模型（生成总结）
+
+走 OpenAI 兼容接口，三个环境变量：
+
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `OPENAI_API_KEY` | 是 | 没配就跳过总结，其余功能不受影响 |
+| `OPENAI_BASE_URL` | 否 | 不填走 OpenAI 官方；换厂商就改这里 |
+| `--summary-model` | 否 | 默认 `gpt-4o-mini`；界面里也有输入框 |
+
+**推荐做法：用 `llm.env.bat` 持久化**（已被 `.gitignore` 忽略，不会入库）
+
+```powershell
+copy llm.env.example.bat llm.env.bat
+notepad llm.env.bat        # 填入自己的 Key
+```
+
+之后双击 `start.bat` 会自动载入，不用每次设环境变量。
+
+常见服务商（填在 `llm.env.bat` 里）：
+
+| 服务商 | `OPENAI_BASE_URL` | `--summary-model` 示例 |
+|---|---|---|
+| 智谱 BigModel | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash`（免费档） |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+| OpenAI | 不填（默认） | `gpt-4o-mini` |
+
+> ⚠️ **改完环境变量必须重启服务**：变量在进程启动时读取，运行中修改不生效。
+> `llm.env.bat` 只在 `start.bat` 启动时被载入一次。
+> 界面右上角的徽标会显示当前是否已配置 LLM（未配置时是红色）。

@@ -15,3 +15,6 @@ eval/review_*.jsonl
 
 # 运行时产物
 reports/
+
+# 本地 LLM 配置（含 Key，绝不入库）
+llm.env.bat

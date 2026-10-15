@@ -59,7 +59,7 @@ class Job:
     id: str
     source: str
     options: dict
-    status: str = "queued"          # queued / running / done / failed
+    status: str = "queued"          # queued / running / paused / done / failed / cancelled
     stage: str = ""
     pct: int = 0
     message: str = "排队中"
@@ -69,6 +69,8 @@ class Job:
     finished_at: str = ""
     out_dir: str = ""
     log: list[str] = field(default_factory=list)
+    # 暂停/取消控制器。在创建任务时就建好，这样排队中的任务也能被取消。
+    control: Any = None
 
     @property
     def title(self) -> str:
@@ -133,6 +135,15 @@ def _on_progress(job: Job, stage: str, pct: int, message: str) -> None:
     job.message = message
 
 
+def _on_control(job: Job, state: str, message: str) -> None:
+    """Control 的状态变化回调（在 worker 线程里被调用）。"""
+    if state == "paused":
+        job.status = "paused"
+    elif state == "running" and job.status == "paused":
+        job.status = "running"
+    job.message = message
+
+
 def _on_log(job: Job, msg: str) -> None:
     if msg.strip():
         job.log.append(msg)
@@ -154,9 +165,15 @@ def _run_job(job: Job) -> None:
     job.status = "running"
     job.started_at = _now()
     job.message = "启动中"
+    control = job.control or extract.Control()
+    job.control = control
+    control.on_state = lambda st, msg: _on_control(job, st, msg)
+    extract.CONTROL = control
     extract.PROGRESS_HOOK = lambda s, p, m: _on_progress(job, s, p, m)
     extract.LOG_HOOK = lambda m: _on_log(job, m)
     try:
+        # 排队期间就被取消的任务，直接跳过
+        control.check()
         extract.require_ffmpeg()
         args = extract.build_parser().parse_args(argv_from_options(job.source, job.options))
         extract.process(job.source, OUT_ROOT, args)
@@ -165,6 +182,9 @@ def _run_job(job: Job) -> None:
         job.status = "done"
         job.pct = 100
         job.message = "完成"
+    except extract.CancelledError:
+        job.status = "cancelled"
+        job.message = "已取消（在检查点停下）"
     except SystemExit as exc:          # extract.die() 走的是 sys.exit
         job.status = "failed"
         job.error = f"处理失败（退出码 {exc.code}），详见日志"
@@ -172,8 +192,10 @@ def _run_job(job: Job) -> None:
         job.status = "failed"
         job.error = f"{type(exc).__name__}: {exc}"
     finally:
+        extract.CONTROL = None
         extract.PROGRESS_HOOK = None
         extract.LOG_HOOK = None
+        job.control = None
         job.finished_at = _now()
 
 
@@ -304,6 +326,7 @@ def create_job(req: JobRequest) -> dict:
     if not extract.is_url(src) and not Path(src).expanduser().exists():
         raise HTTPException(400, f"路径不存在且不是链接: {src}")
     job = Job(id=uuid.uuid4().hex[:12], source=src, options=_options_dict(req))
+    job.control = extract.Control()
     with JOBS_LOCK:
         JOBS[job.id] = job
         if len(JOBS) > MAX_JOBS:
@@ -325,6 +348,48 @@ def get_job(job_id: str) -> dict:
     job = JOBS.get(job_id)
     if job is None:
         raise HTTPException(404, "任务不存在")
+    return job.detail()
+
+
+def _live_job(job_id: str) -> Job:
+    job = JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    if job.status in ("done", "failed", "cancelled"):
+        raise HTTPException(409, f"任务已结束（{job.status}），无法继续操作")
+    return job
+
+
+@app.post("/api/jobs/{job_id}/pause")
+def pause_job(job_id: str) -> dict:
+    """请求暂停。在下一个检查点停下（转写的分段 / OCR 的帧 / 阶段之间）。"""
+    job = _live_job(job_id)
+    if job.control is not None:
+        job.control.pause()
+    return job.detail()
+
+
+@app.post("/api/jobs/{job_id}/resume")
+def resume_job(job_id: str) -> dict:
+    job = _live_job(job_id)
+    if job.control is not None:
+        job.control.resume()
+    return job.detail()
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str) -> dict:
+    """请求取消。排队中/暂停中的任务同样可以取消。"""
+    job = JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "任务不存在")
+    if job.status in ("done", "failed", "cancelled"):
+        raise HTTPException(409, f"任务已结束（{job.status}）")
+    if job.control is not None:
+        job.control.cancel()
+    else:
+        job.status = "cancelled"
+        job.message = "已取消（未开始）"
     return job.detail()
 
 
@@ -356,7 +421,43 @@ if STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
+def _open_browser_when_ready(url: str, tries: int = 60) -> None:
+    """轮询健康检查，服务真的起来之后再打开浏览器。
+
+    直接 sleep 固定秒数是不稳的：模型/依赖首次加载可能超过 3 秒，
+    那样会打开一个"无法连接"的页面。
+    """
+    import time
+    import urllib.request
+    import webbrowser
+
+    for _ in range(tries):
+        time.sleep(0.5)
+        try:
+            urllib.request.urlopen(url + "/api/health", timeout=1)
+            webbrowser.open(url)
+            return
+        except Exception:
+            continue
+    print(f"[提示] 服务启动较慢，请手动打开 {url}")
+
+
 if __name__ == "__main__":
+    import argparse
+    import threading
+
     import uvicorn
 
-    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=False)
+    ap = argparse.ArgumentParser(description="video-extract Web 服务")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--open", action="store_true", help="启动完成后自动打开浏览器")
+    ap.add_argument("--reload", action="store_true", help="改代码自动重载（开发用）")
+    a = ap.parse_args()
+
+    url = f"http://{a.host}:{a.port}"
+    print(f"\n  界面地址: {url}\n  按 Ctrl+C 停止服务\n")
+    if a.open:
+        threading.Thread(target=_open_browser_when_ready, args=(url,), daemon=True).start()
+
+    uvicorn.run("server:app", host=a.host, port=a.port, reload=a.reload)

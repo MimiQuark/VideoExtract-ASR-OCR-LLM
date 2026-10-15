@@ -26,6 +26,8 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,6 +39,70 @@ SUBTITLE_EXTS = [".srt", ".vtt", ".ass", ".json3", ".ttml"]
 DEFAULT_SUB_LANGS = "zh-Hans,zh-CN,zh,zh-Hant,en"
 
 # ----------------------------------------------------------------------------- 基础设施
+
+class CancelledError(Exception):
+    """用户主动取消任务。在检查点抛出，由调用方负责收尾。"""
+
+
+class Control:
+    """任务控制：暂停 / 恢复 / 取消。
+
+    为什么只能在检查点生效：ASR 与 OCR 都是第三方库里的阻塞调用，
+    无法从外部中断单次推理。所以把检查点放在**长循环的迭代处**——
+    转写的每个分段、OCR 的每一帧、下载的每次进度回调、以及各阶段之间。
+    实际粒度约等于"一帧/一句"，对视频这类长任务已经足够灵敏。
+    """
+
+    def __init__(self) -> None:
+        self._cancelled = False
+        self._paused = False
+        self.on_state = None          # 可选回调：(state, message) -> None
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    def cancel(self) -> None:
+        self._cancelled = True
+        self._paused = False          # 取消要能唤醒暂停中的等待
+        self._notify("cancelled", "已请求取消")
+
+    def pause(self) -> None:
+        if not self._cancelled:
+            self._paused = True
+            self._notify("paused", "已暂停（将在当前检查点停下）")
+
+    def resume(self) -> None:
+        self._paused = False
+        self._notify("running", "已恢复")
+
+    def _notify(self, state: str, message: str) -> None:
+        if self.on_state is not None:
+            try:
+                self.on_state(state, message)
+            except Exception:
+                pass
+
+    def check(self) -> None:
+        """检查点：暂停时阻塞等待，取消时抛 CancelledError。"""
+        while self._paused and not self._cancelled:
+            time.sleep(0.2)
+        if self._cancelled:
+            raise CancelledError("任务已取消")
+
+
+# 由调用方（Web 服务）注入；CLI 下为 None，检查点直接放行
+CONTROL: Control | None = None
+
+
+def checkpoint() -> None:
+    if CONTROL is not None:
+        CONTROL.check()
+
 
 # 日志钩子：Web 服务用它把完整日志回传给前端；CLI 下为 None。
 LOG_HOOK = None
@@ -244,6 +310,19 @@ def download(url: str, workdir: Path, want_subs: bool = True) -> tuple[Path, Pat
             "subtitlesformat": "srt/vtt/best",
             "skip_download": False,
         })
+    def _dl_hook(d: dict) -> None:
+        # 下载是最早的长耗时步骤，把进度与检查点都放在这里：
+        # 取消时直接抛错，yt-dlp 会随之退出。
+        checkpoint()
+        if d.get("status") == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            got = d.get("downloaded_bytes") or 0
+            if total:
+                pct = got / total * 100
+                stage("download", 5 + int(pct * 0.04),
+                      f"下载中 {pct:.0f}% ({got / 1048576:.0f}/{total / 1048576:.0f} MB)")
+
+    opts["progress_hooks"] = [_dl_hook]
     log("  -> yt-dlp 下载中 (优先抓现成字幕轨)...")
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -322,6 +401,8 @@ def transcribe(wav: Path, model_name: str, language: str | None,
     # CPU 推理默认只用 4 线程, 显式拉满物理核心能显著提速
     threads = cpu_threads or (os.cpu_count() or 4)
     log(f"  -> CPU 线程数: {threads}")
+    checkpoint()   # 首次使用某模型会联网下载（几百 MB~1.5GB），下载本身无法中断
+    log(f"  -> 加载 Whisper 模型: {model_name} ({device}/{compute_type})")
     try:
         model = WhisperModel(model_name, device=device, compute_type=compute_type,
                              cpu_threads=threads)
@@ -330,6 +411,7 @@ def transcribe(wav: Path, model_name: str, language: str | None,
         model = WhisperModel(model_name, device="cpu", compute_type="int8",
                              cpu_threads=threads)
 
+    checkpoint()
     log("  -> 转写中(首次会自动下载模型)...")
     segments, info = model.transcribe(
         str(wav),
@@ -344,6 +426,7 @@ def transcribe(wav: Path, model_name: str, language: str | None,
 
     out: list[Speech] = []
     for seg in segments:
+        checkpoint()          # 每识别出一句就检查一次暂停/取消
         text = (seg.text or "").strip()
         if not text:
             continue
@@ -373,6 +456,7 @@ def sample_frames(video: Path, frames_dir: Path, interval: float,
         vf.append("crop=iw:ih*0.3:0:0")
     if max_width:
         vf.append(f"scale={max_width}:-2")
+    checkpoint()
     run([
         require_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video), "-vf", ",".join(vf),
@@ -393,6 +477,8 @@ def ocr_frames(frames: list[Path], interval: float, min_score: float) -> list[Sc
     events: list[Screen] = []
     last_key = None
     for idx, img in enumerate(frames):
+        checkpoint()      # 每帧检查：只是一次标志位读取，开销可忽略，
+                          # 换来取消/暂停更灵敏（OCR 一帧约 0.5~2s）
         ts = idx * interval
         try:
             result, _ = engine(str(img))
@@ -808,6 +894,7 @@ def process(source: str, out_root: Path, args) -> None:
     if not speech:
         if args.no_asr:
             die("未找到字幕且指定了 --no-asr，没有可提取的语音内容。")
+        checkpoint()
         stage("asr", 12, "语音转写中（最耗时的一步）…")
         wav = out / "audio.wav"
         extract_audio(video, wav)
@@ -838,6 +925,7 @@ def process(source: str, out_root: Path, args) -> None:
                   json.loads((out / "screen_text.json").read_text(encoding="utf-8"))]
         log(f"  -> 复用已有画面文字: {len(screen)} 条")
     elif args.ocr:
+        checkpoint()
         stage("ocr", 50, "画面文字识别中…")
         frames_dir = out / "frames"
         frames = sample_frames(video, frames_dir, args.ocr_interval,
@@ -863,6 +951,7 @@ def process(source: str, out_root: Path, args) -> None:
     if speech:
         stage("asr", 45, f"语音转写完成: {len(speech)} 段")
 
+    checkpoint()
     if speech and screen and not args.no_repair:
         repaired, fixed_n = repair_with_screen(speech, screen)
         if fixed_n:
@@ -883,6 +972,7 @@ def process(source: str, out_root: Path, args) -> None:
     screen_text = "" if args.no_screen_in_summary else screen_digest(screen)
     summary = None
     if args.summarize and final_speech:
+        checkpoint()
         stage("summarize", 88, "LLM 生成总结中…")
         log("  -> 调用 LLM 生成总结"
             + (f" (语音 {len(final_speech)} 段 + 画面文字 {len(screen_text)} 字)" if screen_text

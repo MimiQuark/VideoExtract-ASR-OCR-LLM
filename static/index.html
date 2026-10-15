@@ -53,6 +53,21 @@
          transition:width .4s}
   .stage{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
   .stage b{color:var(--text);font-weight:600}
+  .ctrls{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
+  .ctrls button{padding:6px 14px;font-size:12px}
+  button.ghost.danger{background:#fef2f2;color:var(--err)}
+  button.ghost:disabled{opacity:.45;cursor:not-allowed}
+  .state{margin-left:auto;font-size:11px;padding:2px 10px;border-radius:20px;
+         background:#eef2f7;color:var(--dim)}
+  .state.running{background:#eef0ff;color:var(--brand)}
+  .state.paused{background:#fff7ed;color:var(--warn)}
+  .state.done{background:#ecfdf5;color:var(--ok)}
+  .state.failed{background:#fef2f2;color:var(--err)}
+  .state.cancelled{background:#f3f4f6;color:#6b7280}
+  .bar.paused>i{background:#cbd5e1}
+  .dot.paused{background:var(--warn)}
+  .dot.cancelled{background:#9ca3af}
+  .note{font-size:12px;color:var(--dim);margin-top:8px}
   pre.log{margin:10px 0 0;max-height:190px;overflow:auto;background:#0f172a;color:#cbd5e1;
           border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;
           line-height:1.55;white-space:pre-wrap}
@@ -163,6 +178,12 @@
       <h2>处理进度</h2>
       <div class="bar"><i id="bar"></i></div>
       <div class="stage"><b id="pct">0%</b><span id="stageMsg">等待中</span></div>
+      <div class="ctrls">
+        <button class="ghost" id="btnPause">暂停</button>
+        <button class="ghost danger" id="btnStop">停止</button>
+        <span class="state" id="stateBadge">排队中</span>
+      </div>
+      <div class="note" id="ctrlNote"></div>
       <pre class="log" id="log"></pre>
     </div>
     <div id="errBox"></div>
@@ -264,6 +285,7 @@ async function poll(){
   $('stageMsg').textContent = j.message + (j.stage ? '  ·  ' + j.stage : '');
   $('log').textContent = (j.log || []).join('\n');   // 每条日志一行
   $('log').scrollTop = $('log').scrollHeight;
+  refreshControls(j);
   if(j.status === 'done'){
     clearInterval(timer); $('run').disabled = false;
     await showResult(id);
@@ -272,8 +294,53 @@ async function poll(){
     clearInterval(timer); $('run').disabled = false;
     $('errBox').innerHTML = '<div class="err">' + esc(j.error || '处理失败') + '</div>';
     loadJobs();
+  }else if(j.status === 'cancelled'){
+    clearInterval(timer); $('run').disabled = false;
+    $('errBox').innerHTML = '<div class="note">任务已取消。中间结果已保留，'
+      + '重跑时勾选「复用已有中间结果」可跳过已完成的步骤。</div>';
+    loadJobs();
   }
 }
+
+// ---- 任务控制：暂停 / 继续 / 停止 ----
+const STATE_TEXT = {queued:'排队中', running:'运行中', paused:'已暂停',
+                    done:'已完成', failed:'失败', cancelled:'已取消'};
+
+function refreshControls(j){
+  const st = j.status;
+  const live = st === 'running' || st === 'paused';
+  $('btnPause').textContent = st === 'paused' ? '继续' : '暂停';
+  $('btnPause').disabled = !live;
+  $('btnStop').disabled = !(live || st === 'queued');
+  const b = $('stateBadge');
+  b.textContent = STATE_TEXT[st] || st;
+  b.className = 'state ' + st;
+  $('bar').parentElement.className = 'bar' + (st === 'paused' ? ' paused' : '');
+  $('ctrlNote').textContent = st === 'paused'
+    ? '暂停在检查点生效（转写分段 / OCR 每帧 / 阶段之间）；暂停期间会占用唯一的工作线程，'
+      + '其他任务需排队等待。'
+    : '';
+}
+
+$('btnPause').onclick = async () => {
+  if(!current) return;
+  try{
+    const j = await api('/api/jobs/' + current);
+    await api(`/api/jobs/${current}/${j.status === 'paused' ? 'resume' : 'pause'}`,
+              {method:'POST'});
+    poll();
+  }catch(e){ alert(e.message); }
+};
+
+$('btnStop').onclick = async () => {
+  if(!current) return;
+  if(!confirm('确定停止这个任务吗？\n\n已下载的视频、已完成的转写/OCR 结果会保留，'
+              + '重跑时可勾选「复用已有中间结果」跳过它们。')) return;
+  try{
+    await api(`/api/jobs/${current}/cancel`, {method:'POST'});
+    poll();
+  }catch(e){ alert(e.message); }
+};
 
 // ---- 结果渲染 ----
 async function showResult(id){
@@ -375,7 +442,8 @@ async function loadJobs(){
     <div class="job ${j.id===current?'active':''}" data-id="${j.id}">
       <span class="dot ${j.status}"></span>
       <span class="nm" title="${esc(j.source)}">${esc(j.title || j.source)}</span>
-      <span style="color:var(--dim)">${j.status==='done' ? Math.round(j.pct)+'%' : esc(j.stage||j.status)}</span>
+      <span style="color:var(--dim)">${j.status==='done' ? Math.round(j.pct)+'%'
+        : esc(STATE_TEXT[j.status] || j.stage || j.status)}</span>
     </div>`).join('');
   document.querySelectorAll('.job').forEach(el => el.onclick = async () => {
     const id = el.dataset.id;
