@@ -328,16 +328,35 @@ def download(url: str, workdir: Path, want_subs: bool = True) -> tuple[Path, Pat
         info = ydl.extract_info(url, download=True)
 
     vid_id = str(info.get("id") or "")
-    video = None
-    for f in sorted(workdir.glob(f"{vid_id}.*")):
-        if f.suffix.lower() in VIDEO_EXTS:
-            video = f
-            break
-    if video is None:
+
+    def _downloaded(exts) -> list[Path]:
+        """找出本次下载产生的文件。
+
+        不能只 glob ``f"{vid_id}.*"``：多 P（分 P）视频会被 yt-dlp 命名成
+        ``<id>_p1.mp4`` / ``<id>_p2.mp4``，分隔符是下划线而不是点，
+        用点号匹配会一个都找不到，然后误报"下载完成但没找到视频文件"
+        （实测一个 3 分 P 的 1.6GB 视频就这样白等了 32 分钟）。
+        这里统一按"以 id 开头"匹配，点号前缀和下划线前缀都兼容。
+        """
+        out: list[Path] = []
+        for f in sorted(workdir.iterdir()):
+            if not f.is_file() or f.suffix.lower() not in exts:
+                continue
+            name = f.name
+            if name.startswith(f"{vid_id}.") or name.startswith(f"{vid_id}_") or name == vid_id:
+                out.append(f)
+        return out
+
+    videos = _downloaded(VIDEO_EXTS)
+    if not videos:
         die(f"下载完成但没找到视频文件，请检查目录: {workdir}")
+    video = videos[0]
+    if len(videos) > 1:
+        log(f"  [提示] 该链接包含 {len(videos)} 个分 P，本次只处理第一个: {video.name}")
+        log("         需要处理其它分 P 请单独传入对应链接。")
 
     sub = None
-    found = [f for f in workdir.glob(f"{vid_id}.*") if f.suffix.lower() in SUBTITLE_EXTS]
+    found = _downloaded(SUBTITLE_EXTS)
     if found:
         # 优先中文
         found.sort(key=lambda p: (0 if re.search(r"zh|chi", p.name, re.I) else 1, len(p.name)))

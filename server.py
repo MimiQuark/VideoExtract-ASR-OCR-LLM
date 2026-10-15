@@ -483,7 +483,8 @@ if __name__ == "__main__":
     # 端口已被占用时的处理：分成"本服务已在跑"和"别的程序占着"两种情况
     if _port_open(a.host, a.port):
         if _is_our_service(url):
-            print(f"\n  端口 {a.port} 上已有本服务在运行，直接打开界面。\n  {url}\n")
+            print(f"\n  端口 {a.port} 上已有本服务在运行，直接打开界面。\n  {url}")
+            print("  提示: 若标签页显示的是旧页面，按 Ctrl+F5 强制刷新。\n")
             import webbrowser
             webbrowser.open(url)
             raise SystemExit(0)
@@ -493,7 +494,9 @@ if __name__ == "__main__":
               f"    2) 先结束占用 {a.port} 的程序，再重新启动\n")
         raise SystemExit(1)
 
-    print(f"\n  界面地址: {url}\n  按 Ctrl+C 停止服务\n")
+    print(f"\n  界面地址: {url}\n  按 Ctrl+C 停止服务")
+    print("  提示: 若浏览器标签页上显示的是别的页面（同一端口被其它项目用过），"
+          "按 Ctrl+F5 强制刷新即可。\n")
     if a.open:
         threading.Thread(target=_open_browser_when_ready, args=(url,), daemon=True).start()
 
