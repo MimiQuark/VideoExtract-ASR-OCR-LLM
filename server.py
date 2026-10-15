@@ -326,6 +326,94 @@ app = FastAPI(title="video-extract", version="1.0.0",
               description="视频内容自动化提取的 Web 界面")
 
 
+# --------------------------------------------------------------------------- 模型配置
+
+ENV_FILE = BASE_DIR / "llm.env.bat"
+_FORBIDDEN = set("\r\n%&|<>^\"")
+
+
+def _mask(key: str) -> str:
+    """只回显掩码，绝不把完整 Key 发给前端。"""
+    if not key:
+        return ""
+    return (key[:6] + "…" + key[-4:]) if len(key) > 14 else "已配置"
+
+
+def _clean(value: str, field: str) -> str:
+    """拒绝会导致 .bat 注入的字符（换行/百分号/重定向等）。
+
+    这些值会被写进 llm.env.bat，一旦允许换行就能往里塞任意命令。
+    """
+    value = (value or "").strip()
+    bad = sorted(set(value) & _FORBIDDEN)
+    if bad:
+        raise HTTPException(400, f"{field} 含不允许的字符: {' '.join(repr(c) for c in bad)}")
+    return value
+
+
+class SettingsRequest(BaseModel):
+    api_key: str = ""
+    base_url: str = ""
+    model: str = ""
+    persist: bool = False      # 是否同时写入 llm.env.bat（重启后仍生效）
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    key = os.environ.get("OPENAI_API_KEY", "")
+    return {
+        "configured": bool(key),
+        "api_key_masked": _mask(key),
+        "base_url": os.environ.get("OPENAI_BASE_URL", ""),
+        "model": os.environ.get("OPENAI_MODEL", ""),
+        # 值来自启动环境还是界面上填的（界面上填的只在内存里，重启就没了）
+        "from_env": bool(os.environ.get("OPENAI_API_KEY_FROM_ENV")),
+        "env_file": str(ENV_FILE),
+        "env_file_exists": ENV_FILE.exists(),
+    }
+
+
+@app.post("/api/settings")
+def save_settings(req: SettingsRequest) -> dict:
+    """配置 LLM。改动只作用于当前进程内存，立即生效、无需重启。
+
+    persist=True 时额外写入 llm.env.bat（已在 .gitignore 中忽略）。
+    """
+    key = _clean(req.api_key, "API Key")
+    base = _clean(req.base_url, "Base URL")
+    model = _clean(req.model, "模型名")
+    if key:
+        os.environ["OPENAI_API_KEY"] = key
+    if base:
+        os.environ["OPENAI_BASE_URL"] = base
+    if model:
+        os.environ["OPENAI_MODEL"] = model
+
+    if req.persist and key:
+        if ENV_FILE.exists():
+            # 备份一份，避免手写内容被直接覆盖
+            ENV_FILE.with_suffix(".bat.bak").write_text(
+                ENV_FILE.read_text(encoding="gbk", errors="replace"), encoding="gbk")
+        lines = [
+            "@echo off",
+            "rem 由界面保存。本文件含密钥，已在 .gitignore 中忽略，不要提交。",
+            f"set OPENAI_API_KEY={key}",
+        ]
+        if base:
+            lines.append(f"set OPENAI_BASE_URL={base}")
+        if model:
+            lines.append(f"set OPENAI_MODEL={model}")
+        for extra in ("HF_ENDPOINT", "HF_HUB_DISABLE_XET"):
+            if os.environ.get(extra):
+                lines.append(f"set {extra}={_clean(os.environ[extra], extra)}")
+        # newline="" 关闭换行转换：否则文本模式会把 \n 再转成 \r\n，
+        # 写成 \r\r\n，文件里每行之间平白多一个空行
+        with open(ENV_FILE, "w", encoding="gbk", newline="") as fh:
+            fh.write("\r\n".join(lines) + "\r\n")
+
+    return get_settings()
+
+
 class JobRequest(BaseModel):
     source: str = Field(..., min_length=1, description="视频链接，或服务器上的文件/目录路径")
     model: str = "medium"
@@ -449,6 +537,10 @@ def download(job_id: str, name: str) -> FileResponse:
         raise HTTPException(404, "文件不存在")
     return FileResponse(target, filename=target.name)
 
+
+# 标记：Key 是否来自启动环境（用于界面区分"环境给的"与"界面填的"）
+if os.environ.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY_FROM_ENV"] = "1"
 
 # 启动即恢复历史任务：否则重启后任务列表为空，页面看起来"什么都没有"
 _restored = recover_jobs_from_disk()

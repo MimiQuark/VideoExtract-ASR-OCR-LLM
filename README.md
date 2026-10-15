@@ -507,6 +507,7 @@ python server.py                         # http://127.0.0.1:8000
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/health` | 服务与 ffmpeg / LLM 配置状态 |
+| GET / POST | `/api/settings` | 读写模型配置（GET 只返回 Key 掩码） |
 | POST | `/api/jobs` | 创建任务 |
 | GET | `/api/jobs` | 历史任务列表 |
 | GET | `/api/jobs/{id}` | 任务状态与实时日志 |
@@ -561,7 +562,17 @@ $env:HF_HUB_DISABLE_XET = "1"     # 镜像不代理新版 Xet 存储，必须同
 | `OPENAI_BASE_URL` | 否 | 不填走 OpenAI 官方；换厂商就改这里 |
 | `--summary-model` | 否 | 默认 `gpt-4o-mini`；界面里也有输入框 |
 
-**推荐做法：用 `llm.env.bat` 持久化**（已被 `.gitignore` 忽略，不会入库）
+**做法一（推荐）：直接在网页里配**
+
+界面左栏有「**模型配置**」卡片，填 API Key / Base URL / 模型名后点保存：
+
+* **立即生效，无需重启**——配置写进服务进程的环境变量，下一次请求就用到
+* **Key 不会回显**：接口只返回掩码（如 `sk-tes…cdef`），前端拿不到完整值
+* 勾选「写入 llm.env.bat」可持久化，重启后自动载入（该文件已在 `.gitignore` 中忽略）
+* 输入会过滤 `换行 % & | < > ^` 等字符——这些值最终要写进 `.bat`，
+  不过滤的话换行就能往里注入命令
+
+**做法二：用 `llm.env.bat`（适合命令行/自动化）**
 
 ```powershell
 copy llm.env.example.bat llm.env.bat
@@ -570,7 +581,7 @@ notepad llm.env.bat        # 填入自己的 Key
 
 之后双击 `start.bat` 会自动载入，不用每次设环境变量。
 
-常见服务商（填在 `llm.env.bat` 里）：
+常见服务商（网页里填，或写进 `llm.env.bat`）：
 
 | 服务商 | `OPENAI_BASE_URL` | `--summary-model` 示例 |
 |---|---|---|
@@ -579,6 +590,7 @@ notepad llm.env.bat        # 填入自己的 Key
 | 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
 | OpenAI | 不填（默认） | `gpt-4o-mini` |
 
-> ⚠️ **改完环境变量必须重启服务**：变量在进程启动时读取，运行中修改不生效。
-> `llm.env.bat` 只在 `start.bat` 启动时被载入一次。
-> 界面右上角的徽标会显示当前是否已配置 LLM（未配置时是红色）。
+> ⚠️ 两种方式的影响范围不同：
+> **网页里配**——写进当前进程内存，立即生效，但**服务重启后失效**（除非勾了持久化）；
+> **环境变量 / llm.env.bat**——只在启动时读取一次，改了要重启才生效。
+> 界面右上角徽标实时显示是否已配置 LLM（未配置是红色）。

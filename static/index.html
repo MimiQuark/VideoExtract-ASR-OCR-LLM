@@ -28,9 +28,9 @@
            display:flex;align-items:center;gap:8px}
   .card>h2 .tag{margin-left:auto;font-weight:400;letter-spacing:0}
   label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
-  input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);
+  input[type=text],input[type=password],select{width:100%;padding:8px 10px;border:1px solid var(--line);
         border-radius:7px;font:inherit;background:#fff}
-  input[type=text]:focus,select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+  input[type=text]:focus,input[type=password]:focus,select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
   .row{display:flex;gap:10px} .row>*{flex:1}
   .chk{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}
   .chk input{width:16px;height:16px;accent-color:var(--brand);flex:none}
@@ -189,6 +189,20 @@
     </section>
 
     <section class="card">
+      <h2>模型配置 <span class="tag" id="cfgState">读取中…</span></h2>
+      <label>API Key</label>
+      <input type="password" id="cfgKey" placeholder="sk-... （留空表示不修改）" autocomplete="off">
+      <label>Base URL <span class="hint" style="color:var(--dim);font-size:11px">（换厂商才需要改）</span></label>
+      <input type="text" id="cfgBase" placeholder="https://open.bigmodel.cn/api/paas/v4">
+      <label>默认模型名</label>
+      <input type="text" id="cfgModel" placeholder="glm-4-flash">
+      <div class="chk"><input type="checkbox" id="cfgPersist" checked>
+        <span>写入 llm.env.bat <span class="hint">（重启后仍生效）</span></span></div>
+      <button class="ghost" id="cfgSave" style="width:100%;margin-top:6px">保存配置</button>
+      <div class="note" id="cfgNote"></div>
+    </section>
+
+    <section class="card">
       <h2>任务记录 <span class="tag" id="jobCount"></span></h2>
       <div class="jobs" id="jobs"><div class="empty" style="padding:12px 0">暂无任务</div></div>
       <div class="note" id="jobsNote"></div>
@@ -269,6 +283,49 @@ async function ping(){
   }
 }
 ping(); setInterval(ping, 15000);
+
+// ---------------- 模型配置 ----------------
+async function loadSettings(){
+  try{
+    const s = await api('/api/settings');
+    $('cfgState').textContent = s.configured
+      ? ('已配置 ' + s.api_key_masked) : '未配置';
+    if (s.base_url) $('cfgBase').value = s.base_url;
+    if (s.model) $('cfgModel').value = s.model;
+    const bits = [];
+    if (s.configured) {
+      bits.push(s.from_env ? 'Key 来自启动环境' : 'Key 由本页填写（仅当前进程内存）');
+    } else {
+      bits.push('未配置时将跳过 LLM 总结，其余功能不受影响');
+    }
+    bits.push('API Key 只保存在服务端，页面不会回显完整值');
+    $('cfgNote').textContent = bits.join('；');
+  }catch(e){
+    $('cfgState').textContent = '读取失败';
+  }
+}
+
+$('cfgSave').onclick = async () => {
+  const btn = $('cfgSave');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try{
+    await api('/api/settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        api_key: $('cfgKey').value, base_url: $('cfgBase').value,
+        model: $('cfgModel').value, persist: $('cfgPersist').checked
+      })
+    });
+    $('cfgKey').value = '';
+    await loadSettings();
+    await ping();
+    $('cfgNote').textContent = '已保存并立即生效。' + $('cfgNote').textContent;
+  }catch(e){
+    $('cfgNote').textContent = '保存失败：' + e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = '保存配置';
+  }
+};
 
 // ---------------- 阶段步骤条 ----------------
 function renderSteps(j){
@@ -561,6 +618,7 @@ async function loadJobs(){
 
 // 首次加载：自动选中最近一个任务，避免"打开就是一片空白"
 (async function init(){
+  await loadSettings();
   await loadJobs();
   try{
     const data = await api('/api/jobs');
