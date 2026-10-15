@@ -6,112 +6,132 @@
 <title>video-extract · 视频内容提取</title>
 <style>
   :root{
-    --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --text:#1c2024; --dim:#6b7280;
+    --bg:#f5f6f8; --panel:#fff; --line:#e4e7eb; --text:#1b1f24; --dim:#6b7280;
     --brand:#4f46e5; --brand-soft:#eef0ff; --ok:#0f9d58; --warn:#d97706; --err:#dc2626;
     --speech:#2563eb; --screen:#7c3aed; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
-  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;
-         display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-  header h1{font-size:16px;margin:0;font-weight:600}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 20px;
+         display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+  header h1{font-size:15px;margin:0;font-weight:600}
   header .sub{color:var(--dim);font-size:12px}
   .badge{margin-left:auto;font-size:12px;padding:3px 10px;border-radius:20px;
          background:var(--brand-soft);color:var(--brand)}
   .badge.off{background:#fef2f2;color:var(--err)}
-  main{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;align-items:start}
-  @media(max-width:900px){main{grid-template-columns:1fr}}
+  main{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;padding:14px;align-items:start}
+  @media(max-width:960px){main{grid-template-columns:1fr}}
+  .col{display:flex;flex-direction:column;gap:14px;min-width:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-  .card h2{font-size:13px;margin:0 0 12px;color:var(--dim);font-weight:600;letter-spacing:.4px}
+  .card>h2{font-size:12px;margin:0 0 12px;color:var(--dim);font-weight:600;letter-spacing:.5px;
+           display:flex;align-items:center;gap:8px}
+  .card>h2 .tag{margin-left:auto;font-weight:400;letter-spacing:0}
   label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
   input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);
         border-radius:7px;font:inherit;background:#fff}
   input[type=text]:focus,select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
-  .row{display:flex;gap:10px}
-  .row>*{flex:1}
-  .chk{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:13px}
-  .chk input{width:16px;height:16px;accent-color:var(--brand)}
-  .chk span.hint{color:var(--dim);font-size:11px}
-  button{border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
+  .row{display:flex;gap:10px} .row>*{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}
+  .chk input{width:16px;height:16px;accent-color:var(--brand);flex:none}
+  .chk .hint{color:var(--dim);font-size:11px}
+  button{border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
   button.primary{background:var(--brand);color:#fff;width:100%;margin-top:14px}
   button.primary:disabled{background:#c7c9d9;cursor:not-allowed}
   button.ghost{background:var(--brand-soft);color:var(--brand);font-size:12px;padding:6px 12px}
-  .jobs{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
-  .job{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
-       font-size:12px;cursor:pointer;border:1px solid transparent}
+  button.ghost.danger{background:#fef2f2;color:var(--err)}
+  button.ghost:disabled{opacity:.4;cursor:not-allowed}
+  /* 历史任务 */
+  .jobs{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
+  .job{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;font-size:12.5px;
+       cursor:pointer;border:1px solid transparent}
   .job:hover{background:var(--bg)}
   .job.active{background:var(--brand-soft);border-color:var(--brand)}
   .dot{width:7px;height:7px;border-radius:50%;background:#cbd5e1;flex:none}
   .dot.running{background:var(--brand);animation:pulse 1.2s infinite}
   .dot.done{background:var(--ok)} .dot.failed{background:var(--err)}
-  @keyframes pulse{50%{opacity:.35}}
+  .dot.paused{background:var(--warn)} .dot.cancelled{background:#9ca3af}
+  @keyframes pulse{50%{opacity:.3}}
   .job .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .job .st{color:var(--dim);flex:none;font-size:11px}
   /* 进度 */
-  .bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 8px}
+  .steps{display:flex;align-items:center;gap:0;margin:0 0 12px;flex-wrap:wrap}
+  .step{font-size:11.5px;color:var(--dim);padding:3px 10px 3px 16px;position:relative;white-space:nowrap}
+  .step:first-child{padding-left:4px}
+  .step::before{content:'';position:absolute;left:4px;top:50%;width:6px;height:6px;
+                margin-top:-3px;border-radius:50%;background:#d8dbe0}
+  .step:first-child::before{display:none}
+  .step:not(:first-child)::after{content:'';position:absolute;left:-2px;top:50%;width:8px;
+                height:1px;background:var(--line)}
+  .step.done{color:var(--ok)} .step.done::before{background:var(--ok)}
+  .step.active{color:var(--brand);font-weight:600} .step.active::before{background:var(--brand);
+                box-shadow:0 0 0 3px var(--brand-soft)}
+  .bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:4px 0 8px}
   .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6366f1,#8b5cf6);
          transition:width .4s}
-  .stage{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
-  .stage b{color:var(--text);font-weight:600}
-  .ctrls{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
-  .ctrls button{padding:6px 14px;font-size:12px}
-  button.ghost.danger{background:#fef2f2;color:var(--err)}
-  button.ghost:disabled{opacity:.45;cursor:not-allowed}
-  .state{margin-left:auto;font-size:11px;padding:2px 10px;border-radius:20px;
-         background:#eef2f7;color:var(--dim)}
+  .bar.paused>i{background:#cbd5e1}
+  .stage{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--dim);gap:12px}
+  .stage b{color:var(--text);font-weight:600;font-family:var(--mono)}
+  .ctrls{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .state{margin-left:auto;font-size:11px;padding:2px 10px;border-radius:20px;background:#eef2f7;color:var(--dim)}
   .state.running{background:#eef0ff;color:var(--brand)}
   .state.paused{background:#fff7ed;color:var(--warn)}
   .state.done{background:#ecfdf5;color:var(--ok)}
   .state.failed{background:#fef2f2;color:var(--err)}
   .state.cancelled{background:#f3f4f6;color:#6b7280}
-  .bar.paused>i{background:#cbd5e1}
-  .dot.paused{background:var(--warn)}
-  .dot.cancelled{background:#9ca3af}
   .note{font-size:12px;color:var(--dim);margin-top:8px}
-  pre.log{margin:10px 0 0;max-height:190px;overflow:auto;background:#0f172a;color:#cbd5e1;
+  .logwrap{margin-top:10px}
+  .loghead{font-size:11.5px;color:var(--dim);cursor:pointer;user-select:none;display:flex;gap:6px}
+  pre.log{margin:6px 0 0;max-height:200px;overflow:auto;background:#0f172a;color:#cbd5e1;
           border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;
           line-height:1.55;white-space:pre-wrap}
+  pre.log.hide{display:none}
   /* Tabs */
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 14px}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:2px 0 14px;flex-wrap:wrap}
   .tab{padding:8px 14px;font-size:13px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent}
   .tab.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+  .tab .cnt{font-size:10.5px;color:var(--dim);margin-left:4px}
   .pane{display:none} .pane.on{display:block}
   /* 统计 */
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
-  .stat{background:var(--bg);border-radius:8px;padding:10px 12px}
-  .stat .v{font-size:19px;font-weight:700;font-family:var(--mono)}
-  .stat .k{font-size:11px;color:var(--dim);margin-top:2px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;margin-bottom:14px}
+  .stat{background:var(--bg);border-radius:8px;padding:9px 12px}
+  .stat .v{font-size:18px;font-weight:700;font-family:var(--mono);line-height:1.3}
+  .stat .k{font-size:11px;color:var(--dim)}
   .stat.warn .v{color:var(--warn)}
   /* 时间轴 */
-  .tl{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .toolbar input[type=text]{width:200px}
+  .tl{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:8px}
   .tl .it{display:flex;gap:10px;padding:7px 12px;border-bottom:1px solid #f1f3f5;font-size:13px}
-  .tl .it:last-child{border-bottom:0}
-  .tl .it:hover{background:#fafbfc}
+  .tl .it:last-child{border-bottom:0} .tl .it:hover{background:#fafbfc}
   .tl .t{font-family:var(--mono);font-size:11.5px;color:var(--dim);flex:none;padding-top:2px}
-  .tl .tag{flex:none;font-size:10px;padding:1px 7px;border-radius:20px;height:18px;line-height:16px}
+  .tag{flex:none;font-size:10px;padding:1px 7px;border-radius:20px;height:18px;line-height:16px}
   .tag.speech{background:#e8f0fe;color:var(--speech)}
   .tag.screen{background:#f3e8ff;color:var(--screen)}
-  .tl .tx{flex:1}
+  .tl .tx{flex:1;min-width:0}
   /* 校对对比 */
   .diff{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
   .diff .h{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-bottom:6px;
-           display:flex;justify-content:space-between}
-  .diff .b{color:var(--dim)}
-  .diff .a{color:var(--text);font-weight:500}
+           display:flex;justify-content:space-between;gap:8px}
+  .diff .b{color:var(--dim)} .diff .a{color:var(--text);font-weight:500}
   .diff .a .hl{background:#dcfce7;color:#166534;border-radius:3px;padding:0 2px}
   .diff.bleed{border-color:#fecaca;background:#fff7f7}
   .pill{font-size:10px;padding:1px 8px;border-radius:20px;background:#fee2e2;color:var(--err)}
   /* 文件 */
   .file{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
         border-radius:8px;margin-bottom:6px;font-size:13px}
-  .file .n{flex:1;font-family:var(--mono)}
-  .file .s{color:var(--dim);font-size:11.5px}
-  a.dl{color:var(--brand);text-decoration:none;font-weight:600;font-size:12px}
-  /* 总结 */
-  .md h2{font-size:15px;margin:16px 0 8px} .md h3{font-size:14px;margin:14px 0 6px}
+  .file .n{flex:1;font-family:var(--mono);min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .file .s{color:var(--dim);font-size:11.5px;flex:none}
+  a.dl{color:var(--brand);text-decoration:none;font-weight:600;font-size:12px;flex:none}
+  /* 内容 */
+  .md h3{font-size:14px;margin:14px 0 6px} .md h4{font-size:13px;margin:12px 0 4px}
   .md ul,.md ol{margin:6px 0;padding-left:22px} .md li{margin:3px 0}
   .md code{background:var(--bg);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
-  .empty{color:var(--dim);font-size:13px;text-align:center;padding:40px 0}
+  .empty{color:var(--dim);font-size:13px;text-align:center;padding:26px 0}
+  .guide{color:var(--dim);font-size:13px;padding:6px 2px}
+  .guide h3{color:var(--text);font-size:14px;margin:0 0 8px}
+  .guide ol{margin:8px 0;padding-left:20px} .guide li{margin:4px 0}
+  .guide code{background:var(--bg);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
   .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;
        padding:10px 12px;font-size:13px}
 </style>
@@ -124,91 +144,98 @@
 </header>
 
 <main>
-  <!-- 左：参数 -->
-  <section class="card">
-    <h2>新建任务</h2>
-    <label>视频来源</label>
-    <input type="text" id="source" placeholder="B站/YouTube 链接，或服务器上的文件路径">
-    <div class="row">
-      <div>
-        <label>Whisper 模型</label>
-        <select id="model">
-          <option>tiny</option><option>base</option><option>small</option>
-          <option selected>medium</option><option>large-v3</option>
-        </select>
+  <!-- ============ 左栏：新建 + 历史 ============ -->
+  <div class="col">
+    <section class="card">
+      <h2>新建任务</h2>
+      <label>视频来源</label>
+      <input type="text" id="source" placeholder="B站/YouTube 链接，或服务器上的文件路径">
+      <div class="row">
+        <div>
+          <label>Whisper 模型</label>
+          <select id="model">
+            <option>tiny</option><option>base</option><option>small</option>
+            <option selected>medium</option><option>large-v3</option>
+          </select>
+        </div>
+        <div>
+          <label>语言</label>
+          <select id="lang">
+            <option value="">自动检测</option><option value="zh" selected>中文</option>
+            <option value="en">英文</option><option value="ja">日文</option>
+          </select>
+        </div>
       </div>
-      <div>
-        <label>语言</label>
-        <select id="lang">
-          <option value="">自动检测</option><option value="zh" selected>中文</option>
-          <option value="en">英文</option><option value="ja">日文</option>
+      <label>画面文字（OCR）</label>
+      <div class="row">
+        <select id="ocr_region">
+          <option value="full" selected>全画面</option>
+          <option value="bottom">仅底部字幕带（快）</option>
+          <option value="top">仅顶部</option>
         </select>
+        <input type="text" id="ocr_interval" value="2" title="抽帧间隔（秒）">
       </div>
-    </div>
+      <div class="chk"><input type="checkbox" id="ocr" checked><span>画面文字识别</span></div>
+      <div class="chk"><input type="checkbox" id="repair" checked>
+        <span>用硬字幕校对 ASR <span class="hint">（核心能力）</span></span></div>
+      <div class="chk"><input type="checkbox" id="summarize">
+        <span>LLM 生成总结 <span class="hint" id="llmHint"></span></span></div>
+      <div class="chk"><input type="checkbox" id="reuse" checked>
+        <span>复用已有中间结果 <span class="hint">（同视频重跑秒级完成）</span></span></div>
+      <input type="text" id="summary_model" value="gpt-4o-mini" style="margin-top:6px"
+             placeholder="总结模型名" title="总结模型名">
+      <button class="primary" id="run">开始提取</button>
+      <div id="submitErr"></div>
+    </section>
 
-    <label>画面文字（OCR）</label>
-    <div class="row">
-      <select id="ocr_region">
-        <option value="full" selected>全画面</option>
-        <option value="bottom">仅底部字幕带（快）</option>
-        <option value="top">仅顶部</option>
-      </select>
-      <input type="text" id="ocr_interval" value="2" title="抽帧间隔（秒）">
-    </div>
+    <section class="card">
+      <h2>任务记录 <span class="tag" id="jobCount"></span></h2>
+      <div class="jobs" id="jobs"><div class="empty" style="padding:12px 0">暂无任务</div></div>
+      <div class="note" id="jobsNote"></div>
+    </section>
+  </div>
 
-    <div class="chk"><input type="checkbox" id="ocr" checked><span>开启画面文字识别</span></div>
-    <div class="chk"><input type="checkbox" id="repair" checked>
-      <span>用硬字幕校对 ASR 错字 <span class="hint">（核心能力）</span></span></div>
-    <div class="chk"><input type="checkbox" id="summarize">
-      <span>LLM 生成结构化总结 <span class="hint">（需 OPENAI_API_KEY）</span></span></div>
-    <div class="chk"><input type="checkbox" id="reuse" checked>
-      <span>复用已有中间结果 <span class="hint">（同一视频重跑时秒级完成）</span></span></div>
-    <input type="text" id="summary_model" value="gpt-4o-mini" style="margin-top:6px"
-           title="总结用的模型名">
-
-    <button class="primary" id="run">开始提取</button>
-
-    <h2 style="margin-top:20px">历史任务</h2>
-    <div class="jobs" id="jobs"><div class="empty" style="padding:14px 0">暂无</div></div>
-  </section>
-
-  <!-- 右：进度 + 结果 -->
-  <section class="card">
-    <div id="progressWrap" style="display:none">
-      <h2>处理进度</h2>
-      <div class="bar"><i id="bar"></i></div>
-      <div class="stage"><b id="pct">0%</b><span id="stageMsg">等待中</span></div>
+  <!-- ============ 右栏：进度 + 结果（各自常驻） ============ -->
+  <div class="col">
+    <!-- 进度 -->
+    <section class="card">
+      <h2>任务进度 <span class="tag" id="progressTitle"></span></h2>
+      <div class="steps" id="steps"></div>
+      <div class="bar" id="bar"><i id="barFill"></i></div>
+      <div class="stage">
+        <span><b id="pct">–</b> <span id="stageMsg">当前没有运行中的任务</span></span>
+        <span class="state" id="stateBadge">空闲</span>
+      </div>
       <div class="ctrls">
-        <button class="ghost" id="btnPause">暂停</button>
-        <button class="ghost danger" id="btnStop">停止</button>
-        <span class="state" id="stateBadge">排队中</span>
+        <button class="ghost" id="btnPause" disabled>暂停</button>
+        <button class="ghost danger" id="btnStop" disabled>停止</button>
       </div>
       <div class="note" id="ctrlNote"></div>
-      <pre class="log" id="log"></pre>
-    </div>
-    <div id="errBox"></div>
-    <div id="resultWrap" style="display:none">
-      <div class="stats" id="stats"></div>
-      <div class="tabs">
-        <div class="tab on" data-pane="p-summary">智能总结</div>
-        <div class="tab" data-pane="p-timeline">时间轴</div>
-        <div class="tab" data-pane="p-diff">校对对比</div>
-        <div class="tab" data-pane="p-files">文件</div>
+      <div class="logwrap">
+        <div class="loghead" id="logToggle">▾ 运行日志 <span id="logCount"></span></div>
+        <pre class="log" id="log"></pre>
       </div>
-      <div class="pane on" id="p-summary"><div class="md" id="summary"></div></div>
-      <div class="pane" id="p-timeline">
-        <div style="margin-bottom:8px">
-          <button class="ghost" data-filter="all">全部</button>
-          <button class="ghost" data-filter="speech">仅语音</button>
-          <button class="ghost" data-filter="screen">仅画面文字</button>
+    </section>
+
+    <!-- 结果 -->
+    <section class="card">
+      <h2>提取结果 <span class="tag" id="resultTitle"></span></h2>
+      <div id="resultBody">
+        <div class="guide" id="guide">
+          <h3>还没有可展示的结果</h3>
+          <p>在左侧填写视频链接或本地路径，点「开始提取」。处理后这里会显示：</p>
+          <ol>
+            <li><b>智能总结</b> —— 语音转写 + 画面文字一起送给 LLM 生成结构化摘要</li>
+            <li><b>时间轴</b> —— 语音与画面文字按时间交织，可搜索、可按类型过滤</li>
+            <li><b>校对对比</b> —— 逐条列出"硬字幕修正 ASR"的前后差异与可疑灌入</li>
+            <li><b>文件</b> —— 校对后 / 原始的字幕与文稿，可单独下载</li>
+          </ol>
+          <p>提示：如果这个视频以前处理过，勾选「复用已有中间结果」可以秒级出结果；
+             已经处理过的任务会出现在左侧「任务记录」里，点一下即可回看。</p>
         </div>
-        <div class="tl" id="timeline"></div>
       </div>
-      <div class="pane" id="p-diff"></div>
-      <div class="pane" id="p-files"></div>
-    </div>
-    <div class="empty" id="placeholder">提交任务后在这里查看进度与结果</div>
-  </section>
+    </section>
+  </div>
 </main>
 
 <script>
@@ -221,13 +248,21 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KB'
                         : (n/1048576).toFixed(1) + ' MB';
+const STATE_TEXT = {queued:'排队中', running:'运行中', paused:'已暂停', done:'已完成',
+                    failed:'失败', cancelled:'已取消'};
+const STAGES = [['resolve','解析输入'],['download','下载'],['asr','语音转写'],['ocr','画面文字'],
+                ['repair','字幕校对'],['summarize','LLM 总结'],['report','生成报告']];
 
-// ---- 健康状态 ----
+let current = null, timer = null, llmReady = false;
+
+// ---------------- 健康状态 ----------------
 async function ping(){
   try{
     const h = await api('/api/health');
+    llmReady = h.llm_configured;
     $('health').textContent = h.llm_configured ? '服务正常 · LLM 已配置' : '服务正常 · 未配 LLM Key';
     $('health').className = 'badge' + (h.llm_configured ? '' : ' off');
+    $('llmHint').textContent = h.llm_configured ? '' : '（未配置，将跳过）';
   }catch(e){
     $('health').textContent = '服务不可用';
     $('health').className = 'badge off';
@@ -235,41 +270,98 @@ async function ping(){
 }
 ping(); setInterval(ping, 15000);
 
-// ---- 提交任务 ----
-let current = null, timer = null;
+// ---------------- 阶段步骤条 ----------------
+function renderSteps(j){
+  const order = j.status === 'done' ? STAGES.length
+              : STAGES.findIndex(s => s[0] === j.stage);
+  $('steps').innerHTML = STAGES.map(([key, name], i) => {
+    let cls = '';
+    if (order >= STAGES.length) cls = 'done';
+    else if (i < order) cls = 'done';
+    else if (i === order) cls = 'active';
+    return `<span class="step ${cls}">${esc(name)}</span>`;
+  }).join('');
+}
+
+// ---------------- 进度区 ----------------
+function renderProgress(j){
+  $('progressTitle').textContent = j ? (j.title || j.source || '') : '';
+  renderSteps(j || {status:'', stage:''});
+  $('barFill').style.width = (j ? j.pct : 0) + '%';
+  $('bar').className = 'bar' + (j && j.status === 'paused' ? ' paused' : '');
+  $('pct').textContent = j ? j.pct + '%' : '–';
+  $('stageMsg').textContent = j
+    ? (j.message + (j.stage ? '  ·  ' + j.stage : ''))
+    : '当前没有运行中的任务';
+  const st = j ? j.status : '';
+  const b = $('stateBadge');
+  b.textContent = j ? (STATE_TEXT[st] || st) : '空闲';
+  b.className = 'state ' + st;
+  const live = st === 'running' || st === 'paused';
+  $('btnPause').textContent = st === 'paused' ? '继续' : '暂停';
+  $('btnPause').disabled = !live;
+  $('btnStop').disabled = !(live || st === 'queued');
+  $('ctrlNote').textContent = st === 'paused'
+    ? '暂停在检查点生效（转写分段 / OCR 每帧 / 阶段之间）；暂停期间占用唯一工作线程，其他任务需排队。'
+    : '';
+  const log = (j && j.log) ? j.log : [];
+  $('log').textContent = log.join('\n');
+  $('logCount').textContent = log.length ? `(${log.length} 行)` : '';
+  $('log').scrollTop = $('log').scrollHeight;
+}
+$('logToggle').onclick = () => {
+  const el = $('log');
+  el.classList.toggle('hide');
+  $('logToggle').textContent = (el.classList.contains('hide') ? '▸ 运行日志 ' : '▾ 运行日志 ')
+    + $('logCount').textContent;
+};
+
+// ---------------- 任务控制 ----------------
+async function ctrl(action){
+  if(!current) return;
+  try{
+    if(action === 'cancel' && !confirm('确定停止这个任务吗？\n\n已下载的视频、已完成的转写/OCR 结果会保留，'
+        + '重跑时勾选「复用已有中间结果」可跳过。')) return;
+    await api(`/api/jobs/${current}/${action}`, {method:'POST'});
+    poll();
+  }catch(e){ alert(e.message); }
+}
+$('btnPause').onclick = async () => {
+  if(!current) return;
+  const j = await api('/api/jobs/' + current);
+  ctrl(j.status === 'paused' ? 'resume' : 'pause');
+};
+$('btnStop').onclick = () => ctrl('cancel');
+
+// ---------------- 提交任务 ----------------
 $('run').onclick = async () => {
   const src = $('source').value.trim();
   if(!src) return alert('请填写视频链接或路径');
-  const body = {
-    source: src,
-    model: $('model').value,
-    lang: $('lang').value || null,
-    ocr: $('ocr').checked,
-    ocr_region: $('ocr_region').value,
-    ocr_interval: parseFloat($('ocr_interval').value) || 2,
-    repair: $('repair').checked,
-    summarize: $('summarize').checked,
-    summary_model: $('summary_model').value.trim() || 'gpt-4o-mini',
-    reuse: $('reuse').checked
-  };
+  $('submitErr').innerHTML = '';
   $('run').disabled = true;
-  $('errBox').innerHTML = '';
   try{
     const job = await api('/api/jobs', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        source: src, model: $('model').value, lang: $('lang').value || null,
+        ocr: $('ocr').checked, ocr_region: $('ocr_region').value,
+        ocr_interval: parseFloat($('ocr_interval').value) || 2,
+        repair: $('repair').checked, summarize: $('summarize').checked,
+        summary_model: $('summary_model').value.trim() || 'gpt-4o-mini',
+        reuse: $('reuse').checked
+      })
     });
+    clearResult();
     watch(job.id);
   }catch(e){
-    $('errBox').innerHTML = '<div class="err">提交失败：' + esc(e.message) + '</div>';
+    $('submitErr').innerHTML = '<div class="err" style="margin-top:10px">提交失败：'
+      + esc(e.message) + '</div>';
     $('run').disabled = false;
   }
 };
 
 function watch(id){
   current = id;
-  $('placeholder').style.display = 'none';
-  $('resultWrap').style.display = 'none';
-  $('progressWrap').style.display = 'block';
   clearInterval(timer);
   timer = setInterval(poll, 1000);
   poll();
@@ -280,181 +372,209 @@ async function poll(){
   if(!current) return;
   let j;
   try{ j = await api('/api/jobs/' + current); }catch(e){ return; }
-  $('bar').style.width = j.pct + '%';
-  $('pct').textContent = j.pct + '%';
-  $('stageMsg').textContent = j.message + (j.stage ? '  ·  ' + j.stage : '');
-  $('log').textContent = (j.log || []).join('\n');   // 每条日志一行
-  $('log').scrollTop = $('log').scrollHeight;
-  refreshControls(j);
+  renderProgress(j);
   if(j.status === 'done'){
     clearInterval(timer); $('run').disabled = false;
-    await showResult(id);
-    loadJobs();
+    await showResult(id); loadJobs();
   }else if(j.status === 'failed'){
     clearInterval(timer); $('run').disabled = false;
-    $('errBox').innerHTML = '<div class="err">' + esc(j.error || '处理失败') + '</div>';
+    $('submitErr').innerHTML = '<div class="err" style="margin-top:10px">'
+      + esc(j.error || '处理失败') + '　（详见上方运行日志）</div>';
     loadJobs();
   }else if(j.status === 'cancelled'){
     clearInterval(timer); $('run').disabled = false;
-    $('errBox').innerHTML = '<div class="note">任务已取消。中间结果已保留，'
+    $('submitErr').innerHTML = '<div class="note">任务已取消。中间结果已保留，'
       + '重跑时勾选「复用已有中间结果」可跳过已完成的步骤。</div>';
     loadJobs();
   }
 }
 
-// ---- 任务控制：暂停 / 继续 / 停止 ----
-const STATE_TEXT = {queued:'排队中', running:'运行中', paused:'已暂停',
-                    done:'已完成', failed:'失败', cancelled:'已取消'};
+// ---------------- 结果区 ----------------
+function clearResult(){ $('resultBody').innerHTML = ''; $('resultTitle').textContent = ''; }
 
-function refreshControls(j){
-  const st = j.status;
-  const live = st === 'running' || st === 'paused';
-  $('btnPause').textContent = st === 'paused' ? '继续' : '暂停';
-  $('btnPause').disabled = !live;
-  $('btnStop').disabled = !(live || st === 'queued');
-  const b = $('stateBadge');
-  b.textContent = STATE_TEXT[st] || st;
-  b.className = 'state ' + st;
-  $('bar').parentElement.className = 'bar' + (st === 'paused' ? ' paused' : '');
-  $('ctrlNote').textContent = st === 'paused'
-    ? '暂停在检查点生效（转写分段 / OCR 每帧 / 阶段之间）；暂停期间会占用唯一的工作线程，'
-      + '其他任务需排队等待。'
-    : '';
-}
-
-$('btnPause').onclick = async () => {
-  if(!current) return;
-  try{
-    const j = await api('/api/jobs/' + current);
-    await api(`/api/jobs/${current}/${j.status === 'paused' ? 'resume' : 'pause'}`,
-              {method:'POST'});
-    poll();
-  }catch(e){ alert(e.message); }
-};
-
-$('btnStop').onclick = async () => {
-  if(!current) return;
-  if(!confirm('确定停止这个任务吗？\n\n已下载的视频、已完成的转写/OCR 结果会保留，'
-              + '重跑时可勾选「复用已有中间结果」跳过它们。')) return;
-  try{
-    await api(`/api/jobs/${current}/cancel`, {method:'POST'});
-    poll();
-  }catch(e){ alert(e.message); }
-};
-
-// ---- 结果渲染 ----
 async function showResult(id){
-  const r = await api('/api/jobs/' + id + '/result');
+  clearInterval(timer); $('run').disabled = false;
+  let r;
+  try{ r = await api('/api/jobs/' + id + '/result'); }
+  catch(e){
+    $('resultBody').innerHTML = '<div class="err">读取结果失败：' + esc(e.message) + '</div>';
+    return;
+  }
+  $('resultTitle').textContent = r.job.title || '';
   const s = r.stats;
-  $('stats').innerHTML = [
-    ['语音片段', s.speech_segments, ''], ['画面文字', s.screen_items, ''],
-    ['校对修正', s.repaired, ''], ['疑似整行灌入', s.bleed, s.bleed ? 'warn' : ''],
-    ['时长', s.duration, '']
-  ].map(([k,v,cls]) => `<div class="stat ${cls}"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+  const stats = [
+    ['语音片段', s.speech_segments], ['画面文字', s.screen_items],
+    ['校对修正', s.repaired], ['疑似整行灌入', s.bleed, s.bleed ? 'warn' : ''],
+    ['视频时长', s.duration]
+  ].map(([k,v,cls]) =>
+    `<div class="stat ${cls||''}"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+
+  $('resultBody').innerHTML = `
+    <div class="stats">${stats}</div>
+    <div class="tabs">
+      <div class="tab on" data-pane="p-summary">智能总结</div>
+      <div class="tab" data-pane="p-timeline">时间轴<span class="cnt">${r.timeline.length}</span></div>
+      <div class="tab" data-pane="p-diff">校对对比<span class="cnt">${r.repair_diff.length}</span></div>
+      <div class="tab" data-pane="p-files">文件<span class="cnt">${r.files.length}</span></div>
+    </div>
+    <div class="pane on" id="p-summary"><div class="md" id="summary"></div></div>
+    <div class="pane" id="p-timeline">
+      <div class="toolbar">
+        <button class="ghost" data-filter="all">全部</button>
+        <button class="ghost" data-filter="speech">仅语音</button>
+        <button class="ghost" data-filter="screen">仅画面文字</button>
+        <input type="text" id="tlSearch" placeholder="搜索内容…">
+      </div>
+      <div class="tl" id="timeline"></div>
+    </div>
+    <div class="pane" id="p-diff">
+      <div class="toolbar">
+        <button class="ghost" data-dfilter="all">全部</button>
+        <button class="ghost" data-dfilter="bleed">仅疑似灌入</button>
+      </div>
+      <div id="diffList"></div>
+    </div>
+    <div class="pane" id="p-files"></div>`;
 
   $('summary').innerHTML = r.summary ? md(r.summary)
-    : '<div class="empty">未生成总结（提交时勾选「LLM 生成结构化总结」）</div>';
+    : '<div class="empty">本次未生成总结（提交时勾选「LLM 生成结构化总结」即可）</div>';
 
-  renderTimeline(r.timeline, 'all');
+  tlData = r.timeline; tlFilter = 'all'; tlKeyword = '';
+  renderTimeline();
+  $('tlSearch').oninput = e => { tlKeyword = e.target.value.trim(); renderTimeline(); };
+  $('tlSearch').value = '';
 
-  $('p-diff').innerHTML = r.repair_diff.length
-    ? r.repair_diff.map(d => `
-        <div class="diff ${d.bleed ? 'bleed' : ''}">
-          <div class="h"><span>${esc(fmtTs(d.start))}</span>
-            ${d.bleed ? '<span class="pill">疑似整行灌入</span>' : ''}</div>
-          <div class="b">${esc(d.before)}</div>
-          <div class="a">→ ${diffHtml(d.before, d.after)}</div>
-        </div>`).join('')
-    : '<div class="empty">本次没有需要修正的片段</div>';
+  diffData = r.repair_diff; diffFilter = 'all';
+  renderDiff();
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+    t.classList.add('on'); $(t.dataset.pane).classList.add('on');
+  });
+  document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => {
+    tlFilter = b.dataset.filter; renderTimeline();
+  });
+  document.querySelectorAll('[data-dfilter]').forEach(b => b.onclick = () => {
+    diffFilter = b.dataset.dfilter; renderDiff();
+  });
 
-  $('p-files').innerHTML = r.files.map(f => `
+  $('p-files').innerHTML = r.files.length ? r.files.map(f => `
     <div class="file"><span class="n">${esc(f.name)}</span>
       <span class="s">${fmtSize(f.size)}</span>
-      <a class="dl" href="/api/jobs/${esc(id)}/files/${encodeURIComponent(f.name)}">下载</a></div>`).join('');
+      <a class="dl" href="/api/jobs/${encodeURIComponent(id)}/files/${encodeURIComponent(f.name)}">下载</a>
+    </div>`).join('') : '<div class="empty">没有产物文件</div>';
+}
 
-  $('resultWrap').style.display = 'block';
+let tlData = [], tlFilter = 'all', tlKeyword = '', tlLimit = 300;
+function renderTimeline(){
+  const kw = tlKeyword.toLowerCase();
+  const list = tlData.filter(x => (tlFilter === 'all' || x.kind === tlFilter)
+                               && (!kw || x.text.toLowerCase().includes(kw)));
+  if(!list.length){ $('timeline').innerHTML = '<div class="empty">没有匹配的内容</div>'; return; }
+  const shown = list.slice(0, tlLimit);
+  $('timeline').innerHTML = shown.map(x => `
+    <div class="it"><span class="t">${esc(x.ts)}</span>
+      <span class="tag ${x.kind}">${x.kind === 'speech' ? '语音' : '画面'}</span>
+      <span class="tx">${esc(x.text)}</span></div>`).join('')
+    + (list.length > shown.length
+        ? `<div class="empty" style="cursor:pointer" onclick="tlLimit+=300;renderTimeline()">
+             还有 ${list.length - shown.length} 条，点击加载更多…</div>`
+        : `<div class="empty" style="padding:10px 0">共 ${list.length} 条</div>`);
+}
+
+let diffData = [], diffFilter = 'all';
+function renderDiff(){
+  const list = diffData.filter(d => diffFilter === 'all' || d.bleed);
+  $('diffList').innerHTML = list.length ? list.map(d => `
+    <div class="diff ${d.bleed ? 'bleed' : ''}">
+      <div class="h"><span>${esc(fmtTs(d.start))}</span>
+        ${d.bleed ? '<span class="pill">疑似整行灌入</span>' : ''}</div>
+      <div class="b">${esc(d.before)}</div>
+      <div class="a">→ ${diffHtml(d.before, d.after)}</div>
+    </div>`).join('')
+    : '<div class="empty">本次没有需要修正的片段</div>';
 }
 
 function fmtTs(t){
   t = Math.max(0, Math.floor(t));
-  const h = String(Math.floor(t/3600)).padStart(2,'0');
-  const m = String(Math.floor(t%3600/60)).padStart(2,'0');
-  return h + ':' + m + ':' + String(t%60).padStart(2,'0');
+  const p = n => String(n).padStart(2, '0');
+  return p(Math.floor(t/3600)) + ':' + p(Math.floor(t%3600/60)) + ':' + p(t%60);
 }
 
-// 极简 markdown：先转义再套标签，避免注入
 function md(src){
-  const out = [];
-  let list = null;
-  const closeList = () => { if(list){ out.push('</'+list+'>'); list = null; } };
+  const out = []; let list = null;
+  const close = () => { if(list){ out.push('</'+list+'>'); list = null; } };
   for(const raw of esc(src).split('\n')){
-    const line = raw.trimEnd();
-    let m;
-    if((m = line.match(/^#{2,3}\s+(.*)$/))){ closeList(); out.push(`<h3>${m[1]}</h3>`); }
-    else if((m = line.match(/^\s*[-*]\s+(.*)$/))){ if(list!=='ul'){closeList();list='ul';out.push('<ul>');} out.push(`<li>${m[1]}</li>`); }
-    else if((m = line.match(/^\s*\d+[.、)]\s+(.*)$/))){ if(list!=='ol'){closeList();list='ol';out.push('<ol>');} out.push(`<li>${m[1]}</li>`); }
-    else if(!line.trim()){ closeList(); }
-    else { closeList(); out.push(`<p>${line}</p>`); }
+    const line = raw.trimEnd(); let m;
+    if((m = line.match(/^#{2,3}\s+(.*)$/))){ close(); out.push(`<h3>${m[1]}</h3>`); }
+    else if((m = line.match(/^#{4,6}\s+(.*)$/))){ close(); out.push(`<h4>${m[1]}</h4>`); }
+    else if((m = line.match(/^\s*[-*]\s+(.*)$/))){ if(list!=='ul'){close();list='ul';out.push('<ul>');} out.push(`<li>${m[1]}</li>`); }
+    else if((m = line.match(/^\s*\d+[.、)]\s+(.*)$/))){ if(list!=='ol'){close();list='ol';out.push('<ol>');} out.push(`<li>${m[1]}</li>`); }
+    else if(!line.trim()){ close(); }
+    else { close(); out.push(`<p>${line}</p>`); }
   }
-  closeList();
+  close();
   return out.join('\n').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                       .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-// 字符级 diff：高亮校对后新增/变化的部分
 function diffHtml(before, after){
   const a = esc(before), b = esc(after);
   let i = 0;
   while(i < a.length && i < b.length && a[i] === b[i]) i++;
   let j = 0;
   while(j < a.length - i && j < b.length - i && a[a.length-1-j] === b[b.length-1-j]) j++;
-  const head = b.slice(0, i);
-  const mid  = b.slice(i, b.length - j);
-  const tail = j ? b.slice(b.length - j) : '';
-  return head + (mid ? `<span class="hl">${mid}</span>` : '') + tail;
+  return b.slice(0, i) + (b.length - j > i ? `<span class="hl">${b.slice(i, b.length - j)}</span>` : '')
+       + (j ? b.slice(b.length - j) : '');
 }
 
-let timelineData = [];
-function renderTimeline(items, filter){
-  timelineData = items;
-  const list = items.filter(x => filter === 'all' || x.kind === filter);
-  $('timeline').innerHTML = list.length ? list.map(x => `
-    <div class="it">
-      <span class="t">${esc(x.ts)}</span>
-      <span class="tag ${x.kind}">${x.kind === 'speech' ? '语音' : '画面'}</span>
-      <span class="tx">${esc(x.text)}</span>
-    </div>`).join('') : '<div class="empty">无内容</div>';
-}
-document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () =>
-  renderTimeline(timelineData, b.dataset.filter));
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
-  document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
-  t.classList.add('on');
-  $(t.dataset.pane).classList.add('on');
-});
-
-// ---- 历史任务 ----
+// ---------------- 历史任务 ----------------
 async function loadJobs(){
-  let data; try{ data = await api('/api/jobs'); }catch(e){ return; }
-  if(!data.jobs.length){ $('jobs').innerHTML = '<div class="empty" style="padding:14px 0">暂无</div>'; return; }
+  let data;
+  try{ data = await api('/api/jobs'); }catch(e){ return; }
+  $('jobCount').textContent = data.jobs.length + ' 个';
+  if(!data.jobs.length){
+    $('jobs').innerHTML = '<div class="empty" style="padding:12px 0">暂无任务</div>';
+    $('jobsNote').textContent = '';
+    return;
+  }
+  const recovered = data.jobs.filter(j => j.recovered).length;
+  $('jobsNote').textContent = recovered
+    ? `其中 ${recovered} 个是从磁盘恢复的历史任务（服务重启后仍在）。` : '';
   $('jobs').innerHTML = data.jobs.map(j => `
     <div class="job ${j.id===current?'active':''}" data-id="${j.id}">
       <span class="dot ${j.status}"></span>
-      <span class="nm" title="${esc(j.source)}">${esc(j.title || j.source)}</span>
-      <span style="color:var(--dim)">${j.status==='done' ? Math.round(j.pct)+'%'
-        : esc(STATE_TEXT[j.status] || j.stage || j.status)}</span>
+      <span class="nm" title="${esc(j.source || j.title)}">${esc(j.title || j.source)}</span>
+      <span class="st">${j.status==='done' ? '100%' : esc(STATE_TEXT[j.status] || j.stage || j.status)}</span>
     </div>`).join('');
   document.querySelectorAll('.job').forEach(el => el.onclick = async () => {
     const id = el.dataset.id;
+    current = id;
     const j = await api('/api/jobs/' + id);
-    if(j.status === 'done'){ current = id; $('progressWrap').style.display='none';
-      $('placeholder').style.display='none'; await showResult(id); loadJobs(); }
-    else if(j.status === 'running' || j.status === 'queued'){ watch(id); }
-    else { $('errBox').innerHTML = '<div class="err">' + esc(j.error||'失败') + '</div>'; }
+    renderProgress(j);
+    if(j.status === 'done'){ await showResult(id); }
+    else if(j.status === 'running' || j.status === 'queued' || j.status === 'paused'){ watch(id); }
+    else { $('submitErr').innerHTML = '<div class="err">' + esc(j.error||'失败') + '</div>'; }
+    loadJobs();
   });
 }
-loadJobs();
+
+// 首次加载：自动选中最近一个任务，避免"打开就是一片空白"
+(async function init(){
+  await loadJobs();
+  try{
+    const data = await api('/api/jobs');
+    const latest = data.jobs.find(j => j.status === 'done') || data.jobs[0];
+    if(latest){
+      current = latest.id;
+      const j = await api('/api/jobs/' + latest.id);
+      renderProgress(j);
+      if(j.status === 'done') await showResult(latest.id);
+      else if(j.status === 'running' || j.status === 'paused') watch(latest.id);
+      loadJobs();
+    }
+  }catch(e){ /* 服务不可用时保持引导页 */ }
+})();
 </script>
 </body>
 </html>

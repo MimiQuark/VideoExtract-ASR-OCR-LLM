@@ -82,6 +82,8 @@ class Job:
             "stage": self.stage, "pct": self.pct, "message": self.message,
             "error": self.error, "created_at": self.created_at,
             "finished_at": self.finished_at, "title": self.title,
+            # 列表接口不带整个 options（太重），只暴露 UI 需要的这一个标记
+            "recovered": bool((self.options or {}).get("recovered")),
         }
 
     def detail(self) -> dict:
@@ -211,6 +213,38 @@ def _worker() -> None:
 
 
 threading.Thread(target=_worker, name="extract-worker", daemon=True).start()
+
+
+# --------------------------------------------------------------------------- 历史恢复
+
+def recover_jobs_from_disk() -> int:
+    """启动时从 output/ 恢复历史任务。
+
+    任务表原先只存在内存里，服务一重启就空了——而真正的产物（逐字稿、报告、
+    画面文字）其实都还在磁盘上，只是列表里看不到，页面因此像"什么都没有"。
+    这里按目录扫描把条目补回来：状态一律标为 done，source 无法还原就留空，
+    id 由目录名哈希得到（跨重启保持稳定，下载链接才不会失效）。
+    """
+    if not OUT_ROOT.exists():
+        return 0
+    restored = 0
+    for d in sorted(OUT_ROOT.iterdir(), key=lambda p: p.stat().st_mtime):
+        if not d.is_dir() or d.name.startswith("_"):
+            continue
+        if not ((d / "transcript.json").exists() or (d / "report.md").exists()):
+            continue          # 空目录/下载缓存，不算任务
+        job_id = "disk-" + uuid.uuid5(uuid.NAMESPACE_URL, d.name).hex[:10]
+        mtime = datetime.fromtimestamp(d.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        job = Job(id=job_id, source="", options={"recovered": True})
+        job.status = "done"
+        job.pct = 100
+        job.message = "已完成（从磁盘恢复的历史任务）"
+        job.out_dir = str(d)
+        job.created_at = mtime
+        job.finished_at = mtime
+        JOBS[job_id] = job
+        restored += 1
+    return restored
 
 
 # --------------------------------------------------------------------------- 结果读取
@@ -415,6 +449,11 @@ def download(job_id: str, name: str) -> FileResponse:
         raise HTTPException(404, "文件不存在")
     return FileResponse(target, filename=target.name)
 
+
+# 启动即恢复历史任务：否则重启后任务列表为空，页面看起来"什么都没有"
+_restored = recover_jobs_from_disk()
+if _restored:
+    print(f"  已从磁盘恢复 {_restored} 个历史任务")
 
 if STATIC_DIR.exists():
     # 挂在最后：静态资源不拦截上面已注册的 /api 路由
