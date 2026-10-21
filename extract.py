@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -35,13 +36,17 @@ VIDEO_EXTS = {
     ".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm",
     ".ts", ".m4v", ".mpg", ".mpeg", ".rmvb", ".3gp",
 }
-SUBTITLE_EXTS = [".srt", ".vtt", ".ass", ".json3", ".ttml"]
+SUBTITLE_EXTS = [".srt", ".vtt"]
 DEFAULT_SUB_LANGS = "zh-Hans,zh-CN,zh,zh-Hant,en"
 
 # ----------------------------------------------------------------------------- 基础设施
 
 class CancelledError(Exception):
     """用户主动取消任务。在检查点抛出，由调用方负责收尾。"""
+
+
+class ExtractError(RuntimeError):
+    """A recoverable per-input extraction failure."""
 
 
 class Control:
@@ -119,7 +124,7 @@ def log(msg: str = "") -> None:
 
 def die(msg: str, code: int = 1):
     log(f"\n[错误] {msg}")
-    sys.exit(code)
+    raise ExtractError(msg)
 
 
 def which(cmd: str) -> str | None:
@@ -207,21 +212,35 @@ def run(cmd: list[str], desc: str = "", quiet: bool = True) -> int:
 
 
 def fmt_ts(seconds: float, srt: bool = False) -> str:
-    seconds = max(0.0, float(seconds))
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
+    total_ms = int(round(max(0.0, float(seconds)) * 1000))
     if srt:
-        ms = int(round((seconds - int(seconds)) * 1000))
-        if ms == 1000:
-            ms, s = 0, s + 1
+        h, rem = divmod(total_ms, 3_600_000)
+        m, rem = divmod(rem, 60_000)
+        s, ms = divmod(rem, 1_000)
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+    total_seconds = total_ms // 1000
+    h, rem = divmod(total_seconds, 3600)
+    m, s = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 def safe_name(text: str) -> str:
     text = re.sub(r"[\\/:*?\"<>|]", "_", text).strip(" .")
     return (text or "video")[:80]
+
+
+def source_identity(source: str, video: Path | None = None) -> str:
+    """Stable short identity used to keep different media from sharing output."""
+    if is_url(source):
+        raw = f"url:{source.strip()}"
+    else:
+        path = (video or Path(source).expanduser())
+        try:
+            stat = path.resolve().stat()
+            raw = f"file:{path.resolve()}|{stat.st_size}|{int(stat.st_mtime)}"
+        except OSError:
+            raw = f"file:{path.resolve()}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:10]
 
 
 _CC = None
@@ -367,20 +386,32 @@ def download(url: str, workdir: Path, want_subs: bool = True) -> tuple[Path, Pat
     return video, sub, title
 
 
+def read_text_auto(path: Path) -> str:
+    """Read SRT/VTT without assuming UTF-8; fall back to GB18030/UTF-16."""
+    raw = path.read_bytes()
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "utf-16"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def parse_srt(path: Path) -> list[Speech]:
-    raw = path.read_text(encoding="utf-8", errors="replace")
-    raw = raw.replace("\r\n", "\n")
+    """Parse SRT and WebVTT cue blocks (HH:MM:SS or MM:SS timestamps)."""
+    raw = read_text_auto(path).replace("\r\n", "\n")
     out: list[Speech] = []
     pattern = re.compile(
-        r"(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})"
+        r"(?:(\d{1,2}):)?(\d{2}):(\d{2})[,.](\d{1,3})\s*-->\s*"
+        r"(?:(\d{1,2}):)?(\d{2}):(\d{2})[,.](\d{1,3})"
     )
     for block in re.split(r"\n\s*\n", raw):
         m = pattern.search(block)
         if not m:
             continue
-        g = [int(x) for x in m.groups()]
-        start = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
-        end = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000
+        h1, m1, s1, ms1, h2, m2, s2, ms2 = m.groups()
+        start = int(h1 or 0) * 3600 + int(m1) * 60 + int(s1) + int(ms1) / 1000
+        end = int(h2 or 0) * 3600 + int(m2) * 60 + int(s2) + int(ms2) / 1000
         body = block[m.end():]
         lines = [ln.strip() for ln in body.split("\n")]
         lines = [ln for ln in lines if ln and not ln.isdigit()]
@@ -389,6 +420,11 @@ def parse_srt(path: Path) -> list[Speech]:
         if text:
             out.append(Speech(start, end, text))
     return out
+
+
+def parse_subtitle(path: Path) -> list[Speech]:
+    """Dispatch by extension; both supported formats use cue-block parsing."""
+    return parse_srt(path)
 
 
 # ----------------------------------------------------------------------------- 2. 音频抽取
@@ -538,7 +574,7 @@ _PUNCT_RE = re.compile(
 
 def _norm_key(text: str) -> str:
     """归一化: 去掉空白与标点, 只保留实义字符, 用于相似度比较。"""
-    return _PUNCT_RE.sub("", text)
+    return _PUNCT_RE.sub("", text).lower()
 
 
 def _sim(a: str, b: str) -> float:
@@ -613,6 +649,12 @@ def _extract_core(screen_text: str, speech_text: str) -> str:
             score = _sim(_norm_key(cand), base_key)
             if score > best_score or (score == best_score and len(cand) < best_len):
                 best_text, best_score, best_len = cand, score, len(cand)
+    if len(tokens) == 1 and len(best_text) > max(12, len(speech_text) * 2):
+        # A single unspaced OCR blob (common for Chinese slides) must not be
+        # treated as a subtitle line. Keep only the longest matched substring.
+        return screen_text[longest.a:longest.a + longest.size].strip()
+    if len(best_text) > max(40, int(len(speech_text) * 2.5)):
+        return ""
     return best_text or screen_text[spans[hit][0]:spans[hit][1]].strip()
 
 
@@ -628,18 +670,21 @@ def _splice_correction(speech_text: str, core: str) -> str:
     sm = difflib.SequenceMatcher(None, speech_text, core, autojunk=False)
     parts: list[str] = []
     replaced = 0
+    inserted = 0
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             parts.append(speech_text[i1:i2])
         elif tag == "replace":
             parts.append(core[j1:j2])
             replaced += i2 - i1
+            inserted += max(0, (j2 - j1) - (i2 - i1))
         elif tag == "delete":
             # 语音比字幕多出来的字(语气词): 保留
             parts.append(speech_text[i1:i2])
         # insert: 字幕比语音多出的字, 丢弃, 避免凭空加词
-    # 改动面积过大说明匹配到了不相干的字幕行, 放弃这次校对
-    if replaced > 0.5 * max(1, len(speech_text)):
+    # 改动面积或新增长度过大，说明匹配到了不相干的字幕/整屏文字，放弃这次校对。
+    limit = 0.5 * max(1, len(speech_text))
+    if replaced > limit or inserted > limit or len(core) > max(3 * len(speech_text), len(speech_text) + 40):
         return speech_text
     return "".join(parts)
 
@@ -894,20 +939,34 @@ def process(source: str, out_root: Path, args) -> Path:
         if existing_sub:
             log(f"  -> 检测到同名字幕文件: {existing_sub.name}")
 
-    out = out_root / safe_name(title)
+    identity = source_identity(source, video)
+    out = out_root / f"{safe_name(title)}__{identity}"
     out.mkdir(parents=True, exist_ok=True)
+    source_record = out / "source.json"
+    reuse_ok = False
+    if args.reuse and source_record.exists():
+        try:
+            reuse_ok = json.loads(source_record.read_text(encoding="utf-8")).get("identity") == identity
+        except Exception:
+            reuse_ok = False
+    source_record.write_text(
+        json.dumps({"source": source, "identity": identity, "title": title}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    if args.reuse and not reuse_ok:
+        log("  -> 已有同名目录但来源不一致，不使用旧转写/OCR")
     stage("download", 8, f"已获取视频: {title}")
 
     # --- 语音 ---
     speech: list[Speech] = []
     lang_note = ""
-    if args.reuse and (out / "transcript.json").exists():
+    if reuse_ok and (out / "transcript.json").exists():
         speech = [Speech(**x) for x in
                   json.loads((out / "transcript.json").read_text(encoding="utf-8"))]
         lang_note = "复用上次转写结果"
         log(f"  -> 复用已有转写: {len(speech)} 段")
     elif existing_sub and not args.force_asr:
-        speech = parse_srt(existing_sub)
+        speech = parse_subtitle(existing_sub)
         lang_note = f"现成字幕轨 ({existing_sub.name})"
         log(f"  -> 解析字幕: {len(speech)} 段")
     if not speech:
@@ -939,7 +998,7 @@ def process(source: str, out_root: Path, args) -> Path:
 
     # --- 画面文字 ---
     screen: list[Screen] = []
-    if args.reuse and (out / "screen_text.json").exists():
+    if reuse_ok and (out / "screen_text.json").exists():
         screen = [Screen(**x) for x in
                   json.loads((out / "screen_text.json").read_text(encoding="utf-8"))]
         log(f"  -> 复用已有画面文字: {len(screen)} 条")
@@ -947,9 +1006,12 @@ def process(source: str, out_root: Path, args) -> Path:
         checkpoint()
         stage("ocr", 50, "画面文字识别中…")
         frames_dir = out / "frames"
+        shutil.rmtree(frames_dir, ignore_errors=True)
         frames = sample_frames(video, frames_dir, args.ocr_interval,
                               args.ocr_region, args.ocr_max_width, args.ocr_max_frames)
         log(f"  -> 抽到 {len(frames)} 帧，开始 OCR...")
+        if args.ocr_max_frames and len(frames) >= args.ocr_max_frames:
+            log(f"  -> [警告] 已达到 --ocr-max-frames={args.ocr_max_frames}，后续画面不再识别")
         screen = ocr_frames(frames, args.ocr_interval, args.ocr_min_score)
         (out / "screen_text.json").write_text(
             json.dumps([s.__dict__ for s in screen], ensure_ascii=False, indent=2),
@@ -1001,15 +1063,15 @@ def process(source: str, out_root: Path, args) -> Path:
     stage("report", 95, "生成报告…")
     build_report(title, source, speech, screen, summary, lang_note or "无", out, repaired)
     stage("done", 100, "完成")
-    # 返回真实输出目录：调用方（Web 服务）必须知道产物写在哪，
-    # 不能靠扫描 output/ 猜"最新目录"——多任务并行时会认错。
-    return out
     log(f"\n✅ 完成 -> {out}")
     log(f"   report.md        汇总报告(时间轴+总结)")
     log(f"   transcript.srt   字幕文件")
     log(f"   transcript.txt   纯文稿")
     if screen:
         log(f"   screen_text.json 画面文字")
+    # 返回真实输出目录：调用方（Web 服务）必须知道产物写在哪，
+    # 不能靠扫描 output/ 猜"最新目录"——多任务并行时会认错。
+    return out
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1040,6 +1102,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     o = p.add_argument_group("画面文字 OCR")
     o.add_argument("--ocr", action="store_true", help="开启画面文字识别(硬字幕/PPT)")
+    o.add_argument("--no-ocr", dest="ocr", action="store_false", default=argparse.SUPPRESS,
+                   help="关闭画面文字识别(默认关闭；与 --ocr 互斥)")
     o.add_argument("--ocr-interval", type=float, default=2.0, help="抽帧间隔秒数 (默认 2)")
     o.add_argument("--ocr-region", default="full", choices=["full", "bottom", "top"],
                    help="识别区域: bottom=只认底部字幕带(更快更准)")
@@ -1069,7 +1133,11 @@ def main() -> None:
     except Exception:
         pass
 
-    log(f"ffmpeg: {require_ffmpeg()}")
+    try:
+        log(f"ffmpeg: {require_ffmpeg()}")
+    except ExtractError as exc:
+        log(f"[错误] {exc}")
+        raise SystemExit(1) from exc
 
     out_root = Path(args.out).expanduser()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -1089,7 +1157,8 @@ def main() -> None:
                 targets.append(item)
 
     if not targets:
-        die("没有找到任何待处理的视频。")
+        log("[错误] 没有找到任何待处理的视频。")
+        raise SystemExit(1)
 
     log(f"共 {len(targets)} 个任务，输出目录: {out_root}")
     ok, fail = 0, 0
@@ -1097,8 +1166,9 @@ def main() -> None:
         try:
             process(t, out_root, args)
             ok += 1
-        except SystemExit:
-            raise
+        except ExtractError as exc:
+            fail += 1
+            log(f"[失败] {t}: {exc}")
         except Exception as exc:
             fail += 1
             log(f"[失败] {t}: {type(exc).__name__}: {exc}")

@@ -4,7 +4,7 @@
 
 | 文件 | 对应产物 | 说明 |
 |---|---|---|
-| `report.excerpt.md` | `report.md` | 汇总报告：元信息 + LLM 总结 + 时间轴（节选前 80 行） |
+| `report.excerpt.md` | `report.md` | 汇总报告：元信息 + 时间轴（本次样例未包含 LLM 总结） |
 | `transcript.excerpt.json` | `transcript.json` | 带时间戳的转写（节选前 25 段） |
 | `repair_diff.excerpt.json` | — | 字幕校对的前后差异（节选前 12 条） |
 
@@ -12,3 +12,5 @@
 > 幻灯片文字。跑一次工具即可在自己的 `output/` 下得到完整版本。
 >
 > 评测用的金标集在 `eval/repair_gold.jsonl`，那是本项目自己的标注产物。
+> 样例中的第三方视频文字仅用于展示输出格式与评测；版权归原作者，若需下架
+> 请替换为自制样例。

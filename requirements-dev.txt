@@ -1,0 +1,3 @@
+pytest>=8,<10
+fastapi>=0.100
+httpx>=0.27

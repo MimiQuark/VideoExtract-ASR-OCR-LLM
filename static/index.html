@@ -182,8 +182,8 @@
         <span>LLM 生成总结 <span class="hint" id="llmHint"></span></span></div>
       <div class="chk"><input type="checkbox" id="reuse" checked>
         <span>复用已有中间结果 <span class="hint">（同视频重跑秒级完成）</span></span></div>
-      <input type="text" id="summary_model" value="gpt-4o-mini" style="margin-top:6px"
-             placeholder="总结模型名" title="总结模型名">
+      <input type="text" id="summary_model" value="" style="margin-top:6px"
+             placeholder="留空使用模型配置" title="总结模型名">
       <button class="primary" id="run">开始提取</button>
       <div id="submitErr"></div>
     </section>
@@ -404,7 +404,7 @@ $('run').onclick = async () => {
         ocr: $('ocr').checked, ocr_region: $('ocr_region').value,
         ocr_interval: parseFloat($('ocr_interval').value) || 2,
         repair: $('repair').checked, summarize: $('summarize').checked,
-        summary_model: $('summary_model').value.trim() || 'gpt-4o-mini',
+        summary_model: $('summary_model').value.trim() || '',
         reuse: $('reuse').checked
       })
     });
@@ -470,12 +470,13 @@ async function showResult(id){
     <div class="stats">${stats}</div>
     <div class="tabs">
       <div class="tab on" data-pane="p-summary">智能总结</div>
-      <div class="tab" data-pane="p-timeline">时间轴<span class="cnt">${r.timeline.length}</span></div>
+      <div class="tab" data-pane="p-timeline">时间轴<span class="cnt">${r.timeline.length}${r.timeline_truncated ? '+' : ''}</span></div>
       <div class="tab" data-pane="p-diff">校对对比<span class="cnt">${r.repair_diff.length}</span></div>
       <div class="tab" data-pane="p-files">文件<span class="cnt">${r.files.length}</span></div>
     </div>
     <div class="pane on" id="p-summary"><div class="md" id="summary"></div></div>
     <div class="pane" id="p-timeline">
+      <div class="empty" style="display:${r.timeline_truncated ? 'block' : 'none'}">时间轴已截断，仅显示前 1200 条</div>
       <div class="toolbar">
         <button class="ghost" data-filter="all">全部</button>
         <button class="ghost" data-filter="speech">仅语音</button>

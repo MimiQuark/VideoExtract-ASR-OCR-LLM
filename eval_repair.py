@@ -56,6 +56,10 @@ def collect_corrections(out_dir: Path) -> tuple[list[dict], int]:
     if not repaired_path.exists():
         return [], len(raw)
     rep = json.loads(repaired_path.read_text(encoding="utf-8"))
+    if len(raw) != len(rep):
+        raise ValueError(
+            f"transcript.json 与 transcript.repaired.json 段数不一致: {len(raw)} vs {len(rep)}"
+        )
     out = []
     for idx, (a, b) in enumerate(zip(raw, rep)):
         if a.get("text") == b.get("text"):
@@ -71,8 +75,8 @@ def collect_corrections(out_dir: Path) -> tuple[list[dict], int]:
     return out, len(raw)
 
 
-def load_gold(path: Path) -> dict[str, dict]:
-    """读取人工标注，返回 {index: case}。"""
+def load_gold(path: Path) -> dict:
+    """读取人工标注，返回 {index: case}，并附带视频来源元数据。"""
     if not path.exists():
         return {}
     try:
@@ -80,7 +84,10 @@ def load_gold(path: Path) -> dict[str, dict]:
     except Exception as exc:
         print(f"[警告] 金标文件解析失败: {exc}")
         return {}
-    return {int(c["index"]): c for c in data.get("cases", [])}
+    result = {int(c["index"]): c for c in data.get("cases", [])}
+    result["__video__"] = data.get("video", "")
+    result["__source__"] = data.get("source", "")
+    return result
 
 
 def evaluate(out_dir: Path, gold: dict[str, dict]) -> dict[str, Any]:
@@ -92,7 +99,12 @@ def evaluate(out_dir: Path, gold: dict[str, dict]) -> dict[str, Any]:
     matched, missing = [], []
     for c in corrections:
         g = gold.get(c["index"])
-        if g is None:
+        same_text = (
+            g is not None
+            and (not g.get("before") or g.get("before") == c["before"])
+            and (not g.get("after") or g.get("after") == c["after"])
+        )
+        if g is None or not same_text:
             missing.append(c)
         else:
             matched.append({**c, "verdict": g.get("verdict", "?"), "reason": g.get("reason", "?")})
@@ -204,7 +216,11 @@ def main() -> int:
         return 1
 
     if args.review:
-        export_review(out_dir, BASE_DIR / "eval" / f"review_{out_dir.name}.jsonl")
+        try:
+            export_review(out_dir, BASE_DIR / "eval" / f"review_{out_dir.name}.json")
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"[错误] 无法导出标注清单: {exc}")
+            return 1
         return 0
 
     gold = load_gold(Path(args.gold).expanduser())
@@ -212,7 +228,11 @@ def main() -> int:
         print(f"[提示] 未找到金标（{args.gold}），只能给出改动清单，无法计算准确率。")
         print("       用 --review 导出清单，逐条填写 verdict 后再跑。")
 
-    report = evaluate(out_dir, gold)
+    try:
+        report = evaluate(out_dir, gold)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"[错误] 无法评估: {exc}")
+        return 1
     if args.json:
         print(json.dumps({k: v for k, v in report.items() if k not in ("cases", "unlabeled_cases")},
                          ensure_ascii=False, indent=2))

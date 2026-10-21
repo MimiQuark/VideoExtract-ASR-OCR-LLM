@@ -1,19 +1,44 @@
-# Python 缓存
+# Python 缓存 / 环境
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
 
 # 运行时产物：全部忽略。样例输出见 examples/（小体积节选）
 output/
+_download/
+frames/
 *.wav
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
 
 # 可重新获取的二进制（setup.ps1 / imageio-ffmpeg 都能装回来，不必进版本库）
 tools/*.exe
+*.onnx
 
 # 人工标注模板（每人自己生成，不入库）
 eval/review_*.jsonl
+eval/review_*.json
 
 # 运行时产物
 reports/
 
 # 本地 LLM 配置（含 Key，绝不入库）
 llm.env.bat
+llm.env.bat.*
+*.bak
+.env
+.env.*
+
+# OS / 编辑器
+.DS_Store
+Thumbs.db

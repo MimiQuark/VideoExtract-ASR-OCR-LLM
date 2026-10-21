@@ -48,7 +48,11 @@ $pkgs = @(
     'rapidocr-onnxruntime',
     'opencv-python-headless',
     'openai',
-    'opencc-python-reimplemented'   # 繁体转简体
+    'opencc-python-reimplemented',   # 繁体转简体
+    'imageio-ffmpeg',                # 无系统 ffmpeg 时的兜底
+    'fastapi',
+    'uvicorn[standard]',
+    'python-multipart'
 )
 conda run -n $envName python -m pip install --upgrade pip -q
 conda run -n $envName python -m pip install @pkgs
@@ -56,8 +60,13 @@ if ($LASTEXITCODE -eq 0) { Good '依赖安装完成' } else { Warn '部分依赖
 
 # ---------- 4. 自检 ----------
 Info '自检'
-conda run -n $envName python -c "import faster_whisper, yt_dlp, rapidocr_onnxruntime; print('python deps OK')"
-if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { Good 'ffmpeg OK' }
+conda run -n $envName python -c "import faster_whisper, yt_dlp, rapidocr_onnxruntime, imageio_ffmpeg; print('python deps OK')"
+conda run -n $envName python -c "import extract; exe=extract.ffmpeg_path(); print('ffmpeg:', exe); raise SystemExit(0 if exe else 1)"
+if ($LASTEXITCODE -ne 0) {
+    Warn '没有找到可用的 ffmpeg。请安装 imageio-ffmpeg，或把 ffmpeg 加入 PATH / 放到 tools\ffmpeg.exe。'
+    exit 1
+}
+Good 'ffmpeg OK'
 
 # ---------- 5. 用法提示 ----------
 $usage = @(
@@ -79,7 +88,7 @@ $usage = @(
     '  $env:OPENAI_API_KEY = "sk-..."',
     '  python extract.py "lecture.mp4" --summarize',
     '',
-    '输出: .\output\<视频名>\report.md',
+    '输出: .\output\<视频名>__<来源id>\report.md',
     '============================================================'
 )
 $usage | ForEach-Object { Write-Host $_ -ForegroundColor Gray }

@@ -106,7 +106,8 @@ def _options_dict(req: "JobRequest") -> dict:
         "model": req.model, "lang": req.lang or "", "ocr": req.ocr,
         "ocr_region": req.ocr_region, "ocr_interval": req.ocr_interval,
         "repair": req.repair, "summarize": req.summarize,
-        "summary_model": req.summary_model, "reuse": req.reuse,
+        "summary_model": req.summary_model or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini",
+        "reuse": req.reuse,
     }
 
 
@@ -154,9 +155,7 @@ def _on_log(job: Job, msg: str) -> None:
 
 
 def _run_job(job: Job) -> None:
-    job.status = "running"
     job.started_at = _now()
-    job.message = "启动中"
     control = job.control or extract.Control()
     job.control = control
     control.on_state = lambda st, msg: _on_control(job, st, msg)
@@ -164,8 +163,10 @@ def _run_job(job: Job) -> None:
     extract.PROGRESS_HOOK = lambda s, p, m: _on_progress(job, s, p, m)
     extract.LOG_HOOK = lambda m: _on_log(job, m)
     try:
-        # 排队期间就被取消的任务，直接跳过
+        # 排队期间被暂停时，保持 paused 状态并阻塞在这里；被取消时直接抛错。
         control.check()
+        job.status = "running"
+        job.message = "启动中"
         extract.require_ffmpeg()
         args = extract.build_parser().parse_args(argv_from_options(job.source, job.options))
         # process() 直接返回产物目录 —— 原先靠"output/ 下最新的目录"来猜，
@@ -222,11 +223,18 @@ def recover_jobs_from_disk() -> int:
     for d in sorted(OUT_ROOT.iterdir(), key=lambda p: p.stat().st_mtime):
         if not d.is_dir() or d.name.startswith("_"):
             continue
-        if not ((d / "transcript.json").exists() or (d / "report.md").exists()):
-            continue          # 空目录/下载缓存，不算任务
+        if not (d / "report.md").exists():
+            continue          # 只有中间产物、没有完成报告的目录不算已完成任务
         job_id = "disk-" + uuid.uuid5(uuid.NAMESPACE_URL, d.name).hex[:10]
         mtime = datetime.fromtimestamp(d.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-        job = Job(id=job_id, source="", options={"recovered": True})
+        source = ""
+        source_file = d / "source.json"
+        if source_file.exists():
+            try:
+                source = json.loads(source_file.read_text(encoding="utf-8")).get("source", "")
+            except Exception:
+                source = ""
+        job = Job(id=job_id, source=source, options={"recovered": True})
         job.status = "done"
         job.pct = 100
         job.message = "已完成（从磁盘恢复的历史任务）"
@@ -313,7 +321,7 @@ def build_result(job: Job) -> dict:
 
 # --------------------------------------------------------------------------- HTTP
 
-app = FastAPI(title="video-extract", version="1.0.0",
+app = FastAPI(title="video-extract", version="1.1.0",
               description="视频内容自动化提取的 Web 界面")
 
 
@@ -380,16 +388,13 @@ def save_settings(req: SettingsRequest) -> dict:
     if model:
         os.environ["OPENAI_MODEL"] = model
 
-    if req.persist and key:
-        if ENV_FILE.exists():
-            # 备份一份，避免手写内容被直接覆盖
-            ENV_FILE.with_suffix(".bat.bak").write_text(
-                ENV_FILE.read_text(encoding="gbk", errors="replace"), encoding="gbk")
+    if req.persist and (key or base or model):
         lines = [
             "@echo off",
             "rem 由界面保存。本文件含密钥，已在 .gitignore 中忽略，不要提交。",
-            f"set OPENAI_API_KEY={key}",
         ]
+        if key:
+            lines.append(f"set OPENAI_API_KEY={key}")
         if base:
             lines.append(f"set OPENAI_BASE_URL={base}")
         if model:
@@ -414,7 +419,7 @@ class JobRequest(BaseModel):
     ocr_interval: float = Field(2.0, gt=0, le=30)
     repair: bool = True
     summarize: bool = False
-    summary_model: str = "gpt-4o-mini"
+    summary_model: str = ""
     reuse: bool = True
 
 
@@ -443,7 +448,9 @@ def create_job(req: JobRequest) -> dict:
     with JOBS_LOCK:
         JOBS[job.id] = job
         if len(JOBS) > MAX_JOBS:
-            for old in sorted(JOBS.values(), key=lambda j: j.created_at)[:len(JOBS) - MAX_JOBS]:
+            removable = [j for j in JOBS.values() if j.status not in ("queued", "running", "paused")]
+            overflow = len(JOBS) - MAX_JOBS
+            for old in sorted(removable, key=lambda j: j.created_at)[:overflow]:
                 JOBS.pop(old.id, None)
     JOB_QUEUE.put(job.id)
     return job.detail()
@@ -477,6 +484,9 @@ def _live_job(job_id: str) -> Job:
 def pause_job(job_id: str) -> dict:
     """请求暂停。在下一个检查点停下（转写的分段 / OCR 的帧 / 阶段之间）。"""
     job = _live_job(job_id)
+    if job.status == "queued":
+        job.status = "paused"
+        job.message = "已暂停（尚未开始）"
     if job.control is not None:
         job.control.pause()
     return job.detail()

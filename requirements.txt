@@ -4,6 +4,7 @@ rapidocr-onnxruntime
 opencv-python-headless
 openai
 opencc-python-reimplemented
+imageio-ffmpeg
 
 # ---- Web 界面（可选，仅 server.py 需要）----
 fastapi
