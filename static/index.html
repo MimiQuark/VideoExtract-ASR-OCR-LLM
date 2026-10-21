@@ -471,7 +471,7 @@ async function showResult(id){
     <div class="tabs">
       <div class="tab on" data-pane="p-summary">智能总结</div>
       <div class="tab" data-pane="p-timeline">时间轴<span class="cnt">${r.timeline.length}${r.timeline_truncated ? '+' : ''}</span></div>
-      <div class="tab" data-pane="p-diff">校对对比<span class="cnt">${r.repair_diff.length}</span></div>
+      <div class="tab" data-pane="p-diff">校对对比<span class="cnt">${r.repair_diff_total}${r.repair_diff.length < r.repair_diff_total ? '+' : ''}</span></div>
       <div class="tab" data-pane="p-files">文件<span class="cnt">${r.files.length}</span></div>
     </div>
     <div class="pane on" id="p-summary"><div class="md" id="summary"></div></div>

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -143,7 +144,9 @@ def _on_control(job: Job, state: str, message: str) -> None:
     if state == "paused":
         job.status = "paused"
     elif state == "running" and job.status == "paused":
-        job.status = "running"
+        job.status = "running" if job.started_at else "queued"
+    elif state == "cancelled":
+        job.status = "cancelled"
     job.message = message
 
 
@@ -221,7 +224,7 @@ def recover_jobs_from_disk() -> int:
         return 0
     restored = 0
     for d in sorted(OUT_ROOT.iterdir(), key=lambda p: p.stat().st_mtime):
-        if not d.is_dir() or d.name.startswith("_"):
+        if not d.is_dir() or d.name.startswith("_download"):
             continue
         if not (d / "report.md").exists():
             continue          # 只有中间产物、没有完成报告的目录不算已完成任务
@@ -280,20 +283,28 @@ def build_result(job: Job) -> dict:
         report = (out_dir / "report.md").read_text(encoding="utf-8")
 
     # 校对差异：逐段对比原始转写与校对结果
+    repair_ok = bool(repaired) and len(raw) == len(repaired)
+    data_warning = ""
+    if repaired and not repair_ok:
+        data_warning = "transcript.repaired.json 与 transcript.json 段数不一致，已忽略校对结果"
     diffs = []
-    for a, b in zip(raw, repaired):
-        if a.get("text") != b.get("text"):
-            before, after = a.get("text", ""), b.get("text", "")
-            bleed = len(after) > len(before) * BLEED_RATIO or len(after) - len(before) > BLEED_DELTA
-            diffs.append({"start": a.get("start", 0.0), "before": before,
-                          "after": after, "bleed": bleed})
+    if repair_ok:
+        for a, b in zip(raw, repaired):
+            if a.get("text") != b.get("text"):
+                before, after = a.get("text", ""), b.get("text", "")
+                bleed = len(after) > len(before) * BLEED_RATIO or len(after) - len(before) > BLEED_DELTA
+                diffs.append({"start": a.get("start", 0.0), "before": before,
+                              "after": after, "bleed": bleed})
 
     # 时间轴：复用 extract 的合并逻辑，保证与 report.md 一致
     timeline = []
+    timeline_truncated = False
     if raw or screen:
-        speech_objs = [extract.Speech(**x) for x in (repaired or raw)]
+        speech_objs = [extract.Speech(**x) for x in (repaired if repair_ok else raw)]
         screen_objs = [extract.Screen(**x) for x in screen]
-        for ts, kind, text in extract.merge_timeline(speech_objs, screen_objs)[:MAX_TIMELINE]:
+        full_timeline = extract.merge_timeline(speech_objs, screen_objs)
+        timeline_truncated = len(full_timeline) > MAX_TIMELINE
+        for ts, kind, text in full_timeline[:MAX_TIMELINE]:
             timeline.append({"t": round(ts, 3), "ts": extract.fmt_ts(ts), "kind": kind, "text": text})
 
     files = []
@@ -313,8 +324,10 @@ def build_result(job: Job) -> dict:
             "duration": extract.fmt_ts(duration) if duration else "00:00:00",
         },
         "repair_diff": diffs[:300],
+        "repair_diff_total": len(diffs),
+        "data_warning": data_warning,
         "timeline": timeline,
-        "timeline_truncated": len(timeline) >= MAX_TIMELINE,
+        "timeline_truncated": timeline_truncated,
         "files": files,
     }
 
@@ -329,6 +342,33 @@ app = FastAPI(title="video-extract", version="1.1.0",
 
 ENV_FILE = BASE_DIR / "llm.env.bat"
 _FORBIDDEN = set("\r\n%&|<>^\"")
+_ALLOWED_ENV = {
+    "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL",
+    "HF_ENDPOINT", "HF_HUB_DISABLE_XET",
+}
+
+
+def load_env_file() -> int:
+    """Load allowlisted `set NAME=value` lines written by the settings page."""
+    if not ENV_FILE.exists():
+        return 0
+    loaded = 0
+    try:
+        text = ENV_FILE.read_text(encoding="gbk", errors="replace")
+    except OSError:
+        return 0
+    for line in text.splitlines():
+        match = re.match(r"\s*set\s+([A-Z0-9_]+)=(.*)$", line, re.IGNORECASE)
+        if not match:
+            continue
+        name, value = match.group(1).upper(), match.group(2).strip()
+        if name in _ALLOWED_ENV and name not in os.environ:
+            os.environ[name] = value
+            loaded += 1
+    return loaded
+
+
+load_env_file()
 
 
 def _mask(key: str) -> str:
@@ -383,6 +423,7 @@ def save_settings(req: SettingsRequest) -> dict:
     model = _clean(req.model, "模型名")
     if key:
         os.environ["OPENAI_API_KEY"] = key
+        os.environ["OPENAI_API_KEY_FROM_ENV"] = "0"
     if base:
         os.environ["OPENAI_BASE_URL"] = base
     if model:
@@ -404,14 +445,17 @@ def save_settings(req: SettingsRequest) -> dict:
                 lines.append(f"set {extra}={_clean(os.environ[extra], extra)}")
         # newline="" 关闭换行转换：否则文本模式会把 \n 再转成 \r\n，
         # 写成 \r\r\n，文件里每行之间平白多一个空行
-        with open(ENV_FILE, "w", encoding="gbk", newline="") as fh:
-            fh.write("\r\n".join(lines) + "\r\n")
+        try:
+            with open(ENV_FILE, "w", encoding="gbk", newline="") as fh:
+                fh.write("\r\n".join(lines) + "\r\n")
+        except UnicodeEncodeError as exc:
+            raise HTTPException(400, "配置包含 GBK 无法表示的字符，无法持久化") from exc
 
     return get_settings()
 
 
 class JobRequest(BaseModel):
-    source: str = Field(..., min_length=1, description="视频链接，或服务器上的文件/目录路径")
+    source: str = Field(..., min_length=1, description="视频链接，或服务器上的单个文件路径")
     model: str = "medium"
     lang: str | None = None
     ocr: bool = True
@@ -441,8 +485,12 @@ def health() -> dict:
 @app.post("/api/jobs")
 def create_job(req: JobRequest) -> dict:
     src = req.source.strip()
-    if not extract.is_url(src) and not Path(src).expanduser().exists():
-        raise HTTPException(400, f"路径不存在且不是链接: {src}")
+    if not extract.is_url(src):
+        path = Path(src).expanduser()
+        if not path.exists():
+            raise HTTPException(400, f"路径不存在且不是链接: {src}")
+        if path.is_dir():
+            raise HTTPException(400, "Web 仅支持单个视频文件或链接；目录批量请用 CLI")
     job = Job(id=uuid.uuid4().hex[:12], source=src, options=_options_dict(req))
     job.control = extract.Control()
     with JOBS_LOCK:
@@ -508,11 +556,12 @@ def cancel_job(job_id: str) -> dict:
         raise HTTPException(404, "任务不存在")
     if job.status in ("done", "failed", "cancelled"):
         raise HTTPException(409, f"任务已结束（{job.status}）")
-    if job.control is not None:
-        job.control.cancel()
-    else:
+    if job.status in ("queued", "paused") and not job.started_at:
         job.status = "cancelled"
         job.message = "已取消（未开始）"
+        job.finished_at = _now()
+    if job.control is not None:
+        job.control.cancel()
     return job.detail()
 
 

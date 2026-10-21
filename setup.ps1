@@ -10,6 +10,8 @@ function Info($m) { Write-Host "`n==> $m" -ForegroundColor Cyan }
 function Good($m) { Write-Host "    [OK] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "    [!]  $m" -ForegroundColor Yellow }
 
+Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
+
 # ---------- 1. ffmpeg ----------
 Info '检查 ffmpeg'
 if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {

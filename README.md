@@ -165,7 +165,7 @@ python -m pytest -q
 python -m compileall -q extract.py server.py eval_repair.py
 ```
 
-15 项测试覆盖 `fmt_ts` 进位、SRT/VTT/GBK 解析、单 token OCR 防灌入、校对插入长度、来源身份、gold 前后文匹配、任务恢复和模型默认值。CI 在 Python 3.11 上安装 `requirements-dev.txt` 后运行这些测试，不下载模型。
+18 项测试覆盖 `fmt_ts` 进位、SRT/VTT/GBK 解析（含 VTT cue 设置）、单 token OCR 防灌入、校对插入长度、来源身份、gold 前后文匹配、批量退出码、任务恢复、设置文件加载和模型默认值。CI 在 Python 3.11 上安装 `requirements-dev.txt` 后运行这些测试，不下载模型。
 
 ## 文件
 

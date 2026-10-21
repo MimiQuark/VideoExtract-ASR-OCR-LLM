@@ -237,7 +237,7 @@ def source_identity(source: str, video: Path | None = None) -> str:
         path = (video or Path(source).expanduser())
         try:
             stat = path.resolve().stat()
-            raw = f"file:{path.resolve()}|{stat.st_size}|{int(stat.st_mtime)}"
+            raw = f"file:{path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}"
         except OSError:
             raw = f"file:{path.resolve()}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:10]
@@ -327,6 +327,7 @@ def download(url: str, workdir: Path, want_subs: bool = True) -> tuple[Path, Pat
             "writeautomaticsub": True,
             "subtitleslangs": DEFAULT_SUB_LANGS.split(","),
             "subtitlesformat": "srt/vtt/best",
+            "convertsubtitles": "srt",
             "skip_download": False,
         })
     def _dl_hook(d: dict) -> None:
@@ -413,6 +414,8 @@ def parse_srt(path: Path) -> list[Speech]:
         start = int(h1 or 0) * 3600 + int(m1) * 60 + int(s1) + int(ms1) / 1000
         end = int(h2 or 0) * 3600 + int(m2) * 60 + int(s2) + int(ms2) / 1000
         body = block[m.end():]
+        if "\n" in body:
+            body = body.split("\n", 1)[1]
         lines = [ln.strip() for ln in body.split("\n")]
         lines = [ln for ln in lines if ln and not ln.isdigit()]
         text = " ".join(lines)
@@ -747,7 +750,7 @@ def coalesce_screen(screen: list[Screen]) -> list[Screen]:
     out: list[Screen] = []
     for s in screen:
         key = re.sub(r"\s+", "", s.text)
-        if out and re.sub(r"\s+", "", out[-1].text) == key:
+        if out and re.sub(r"\s+", "", out[-1].text) == key and s.start - out[-1].end <= 3.0:
             out[-1].end = max(out[-1].end, s.end)
             continue
         out.append(Screen(s.start, s.end, s.text))
@@ -804,7 +807,7 @@ def _speech_block(speech: list[Speech], limit: int) -> tuple[str, int]:
     return "\n".join(lines), used
 
 
-def summarize(speech: list[Speech], title: str, model: str = "gpt-4o-mini",
+def summarize(speech: list[Speech], title: str, model: str | None = None,
               screen_text: str = "") -> str | None:
     """用 LLM 生成结构化总结。
 
@@ -813,6 +816,7 @@ def summarize(speech: list[Speech], title: str, model: str = "gpt-4o-mini",
       - 画面文字给"展示过什么"(幻灯片标题、框架名、代码、表格),
         用来补全语音里指代不明或一笔带过的部分(如"这三个框架"到底是哪三个)。
     """
+    model = model or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
     if not os.environ.get("OPENAI_API_KEY"):
         log("  [跳过] 未设置 OPENAI_API_KEY，不做 LLM 总结。")
         return None
@@ -953,6 +957,17 @@ def process(source: str, out_root: Path, args) -> Path:
         json.dumps({"source": source, "identity": identity, "title": title}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    if not reuse_ok:
+        for name in (
+            "transcript.json", "transcript.srt", "transcript.txt",
+            "transcript.repaired.json", "transcript.repaired.srt", "transcript.repaired.txt",
+            "screen_text.json", "audio.wav", "report.md",
+        ):
+            (out / name).unlink(missing_ok=True)
+        shutil.rmtree(out / "frames", ignore_errors=True)
+    if args.no_repair:
+        for name in ("transcript.repaired.json", "transcript.repaired.srt", "transcript.repaired.txt"):
+            (out / name).unlink(missing_ok=True)
     if args.reuse and not reuse_ok:
         log("  -> 已有同名目录但来源不一致，不使用旧转写/OCR")
     stage("download", 8, f"已获取视频: {title}")
@@ -1007,11 +1022,15 @@ def process(source: str, out_root: Path, args) -> Path:
         stage("ocr", 50, "画面文字识别中…")
         frames_dir = out / "frames"
         shutil.rmtree(frames_dir, ignore_errors=True)
-        frames = sample_frames(video, frames_dir, args.ocr_interval,
-                              args.ocr_region, args.ocr_max_width, args.ocr_max_frames)
+        limit = args.ocr_max_frames
+        frames = sample_frames(
+            video, frames_dir, args.ocr_interval, args.ocr_region,
+            args.ocr_max_width, (limit + 1) if limit else None,
+        )
+        if limit and len(frames) > limit:
+            frames = frames[:limit]
+            log(f"  -> [警告] 已达到 --ocr-max-frames={limit}，后续画面不再识别")
         log(f"  -> 抽到 {len(frames)} 帧，开始 OCR...")
-        if args.ocr_max_frames and len(frames) >= args.ocr_max_frames:
-            log(f"  -> [警告] 已达到 --ocr-max-frames={args.ocr_max_frames}，后续画面不再识别")
         screen = ocr_frames(frames, args.ocr_interval, args.ocr_min_score)
         (out / "screen_text.json").write_text(
             json.dumps([s.__dict__ for s in screen], ensure_ascii=False, indent=2),
@@ -1118,26 +1137,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = p.add_argument_group("总结")
     s.add_argument("--summarize", action="store_true", help="用 LLM 生成结构化总结")
-    s.add_argument("--summary-model", default="gpt-4o-mini")
+    s.add_argument("--summary-model", default=None,
+                   help="总结模型；留空时读取 OPENAI_MODEL，再回退 gpt-4o-mini")
     s.add_argument("--no-screen-in-summary", action="store_true",
                    help="总结时只用语音转写, 不并入画面文字(默认两者都送入, 便于补全指代不明的表述)")
 
     return p
 
 
-def main() -> None:
+def main() -> int:
     args = build_parser().parse_args()
 
     try:
         sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     except Exception:
         pass
-
-    try:
-        log(f"ffmpeg: {require_ffmpeg()}")
-    except ExtractError as exc:
-        log(f"[错误] {exc}")
-        raise SystemExit(1) from exc
 
     out_root = Path(args.out).expanduser()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -1158,7 +1172,7 @@ def main() -> None:
 
     if not targets:
         log("[错误] 没有找到任何待处理的视频。")
-        raise SystemExit(1)
+        return 1
 
     log(f"共 {len(targets)} 个任务，输出目录: {out_root}")
     ok, fail = 0, 0
@@ -1177,7 +1191,8 @@ def main() -> None:
     log(f"全部结束: 成功 {ok} / 失败 {fail}")
     if ok:
         log(f"报告位置: {out_root.resolve()}")
+    return 1 if fail else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

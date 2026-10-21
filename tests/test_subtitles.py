@@ -16,6 +16,17 @@ def test_parse_vtt_with_short_timestamps(tmp_path: Path):
     assert speech[1].text == "再见"
 
 
+def test_parse_vtt_cue_settings_are_not_text(tmp_path: Path):
+    path = tmp_path / "sub.vtt"
+    path.write_text(
+        "WEBVTT\n\n00:01.000 --> 00:02.000 align:start position:0%\n你好\n",
+        encoding="utf-8",
+    )
+    speech = extract.parse_subtitle(path)
+    assert len(speech) == 1
+    assert speech[0].text == "你好"
+
+
 def test_parse_gbk_srt(tmp_path: Path):
     path = tmp_path / "sub.srt"
     path.write_bytes(
